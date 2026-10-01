@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
 
+import '../data/deck_library.dart';
+import '../models/deck.dart';
 import '../widgets/section_panel.dart';
+import 'deck_builder_screen.dart';
 import 'game_board_screen.dart';
 
 /// Lets a player create or join a match before heading to the game
@@ -92,9 +95,43 @@ class _GameLobbyScreenState extends State<GameLobbyScreen> {
   }
 
   void _enterGame(BuildContext context) {
+    if (!deckLibrary.hasValidDeck) {
+      _showNoValidDeckDialog(context);
+      return;
+    }
     Navigator.push(
       context,
       MaterialPageRoute(builder: (_) => const GameBoardScreen()),
+    );
+  }
+
+  void _showNoValidDeckDialog(BuildContext context) {
+    showDialog<void>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('No Valid Deck'),
+        content: Text(
+          'You need a saved deck with exactly ${Deck.deckSize} cards (no more than '
+          '${Deck.maxCopiesPerCard} copies of any one card) before starting a game. '
+          'Go build one in Deck Builder.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              Navigator.of(dialogContext).pop();
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => const DeckBuilderScreen()),
+              );
+            },
+            child: const Text('Go to Deck Builder'),
+          ),
+        ],
+      ),
     );
   }
 }

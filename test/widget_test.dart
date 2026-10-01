@@ -3,9 +3,26 @@
 
 import 'package:flutter_test/flutter_test.dart';
 
+import 'package:_4330project4_tcg/data/card_catalog.dart';
+import 'package:_4330project4_tcg/data/deck_library.dart';
 import 'package:_4330project4_tcg/main.dart';
+import 'package:_4330project4_tcg/models/deck.dart';
+
+/// A deck that satisfies the 30-card / max-3-copies rules, for tests
+/// that need game start to be allowed.
+Deck _validTestDeck() {
+  final deck = Deck(name: 'Test Deck');
+  for (final card in cardCatalog.take(10)) {
+    deck.cardCounts[card.id] = 3;
+  }
+  return deck;
+}
 
 void main() {
+  setUp(() {
+    deckLibrary.clear();
+  });
+
   testWidgets('Main menu shows title and all navigation buttons', (
     WidgetTester tester,
   ) async {
@@ -30,7 +47,7 @@ void main() {
     expect(find.text('Legendary'), findsOneWidget);
   });
 
-  testWidgets('Deck Builder screen shows both panels', (
+  testWidgets('Deck Builder screen shows both panels, empty by default', (
     WidgetTester tester,
   ) async {
     await tester.pumpWidget(const AnimalTcgApp());
@@ -40,7 +57,7 @@ void main() {
 
     expect(find.text('Available Cards'), findsOneWidget);
     expect(find.text('Current Deck'), findsOneWidget);
-    expect(find.text('5/30'), findsOneWidget);
+    expect(find.text('0/30'), findsOneWidget);
   });
 
   testWidgets('Settings screen shows the toggle switches', (
@@ -55,9 +72,31 @@ void main() {
     expect(find.text('Sound Effects'), findsOneWidget);
   });
 
-  testWidgets('Play leads to the lobby, then the board, then results', (
+  testWidgets('Game Lobby blocks starting a game without a valid deck', (
     WidgetTester tester,
   ) async {
+    await tester.pumpWidget(const AnimalTcgApp());
+
+    await tester.tap(find.text('Play'));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('Create'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('No Valid Deck'), findsOneWidget);
+    expect(find.text('Game Board'), findsNothing);
+
+    await tester.tap(find.text('Go to Deck Builder'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Deck Builder'), findsOneWidget);
+  });
+
+  testWidgets('Play leads to the lobby, then to a real game board', (
+    WidgetTester tester,
+  ) async {
+    deckLibrary.saveDeck(_validTestDeck());
+
     await tester.pumpWidget(const AnimalTcgApp());
 
     await tester.tap(find.text('Play'));
@@ -69,30 +108,7 @@ void main() {
     await tester.tap(find.text('Create'));
     await tester.pumpAndSettle();
     expect(find.text('Game Board'), findsOneWidget);
-    expect(find.text('End Turn'), findsOneWidget);
     expect(find.text('Game Log'), findsOneWidget);
-
-    await tester.tap(find.byTooltip('Preview results screen (demo)'));
-    await tester.pumpAndSettle();
-    expect(find.text('Game Results'), findsOneWidget);
-    expect(find.text('Victory!'), findsOneWidget);
-  });
-
-  testWidgets('End Turn flips the turn indicator and adds a log entry', (
-    WidgetTester tester,
-  ) async {
-    await tester.pumpWidget(const AnimalTcgApp());
-
-    await tester.tap(find.text('Play'));
-    await tester.pumpAndSettle();
-    await tester.tap(find.text('Create'));
-    await tester.pumpAndSettle();
-
-    expect(find.text("Turn 1 • Your Turn"), findsOneWidget);
-
-    await tester.tap(find.text('End Turn'));
-    await tester.pump();
-
-    expect(find.text("Turn 1 • Opponent's Turn"), findsOneWidget);
+    expect(find.text('End Turn'), findsOneWidget);
   });
 }

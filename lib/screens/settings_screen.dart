@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 
-/// Placeholder settings screen. The switches toggle their own
-/// on-screen state but don't persist or affect anything yet.
+import '../audio/music_settings_scope.dart';
+
+/// Music controls the app's volume. Sound effects and animations remain
+/// local placeholder switches.
 class SettingsScreen extends StatefulWidget {
   const SettingsScreen({super.key});
 
@@ -10,12 +12,12 @@ class SettingsScreen extends StatefulWidget {
 }
 
 class _SettingsScreenState extends State<SettingsScreen> {
-  bool _musicEnabled = true;
   bool _soundEnabled = true;
   bool _animationsEnabled = true;
 
   @override
   Widget build(BuildContext context) {
+    final musicSettings = MusicSettingsScope.of(context);
     return Scaffold(
       appBar: AppBar(title: const Text('Settings')),
       body: ListView(
@@ -23,8 +25,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
         children: [
           SwitchListTile(
             title: const Text('Music'),
-            value: _musicEnabled,
-            onChanged: (value) => setState(() => _musicEnabled = value),
+            value: musicSettings.musicEnabled,
+            onChanged: musicSettings.onMusicEnabledChanged,
           ),
           SwitchListTile(
             title: const Text('Sound Effects'),

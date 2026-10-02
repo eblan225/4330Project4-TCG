@@ -8,6 +8,8 @@ import 'package:_4330project4_tcg/data/deck_library.dart';
 import 'package:_4330project4_tcg/main.dart';
 import 'package:_4330project4_tcg/models/deck.dart';
 
+import 'support/fake_music_player.dart';
+
 /// A deck that satisfies the 30-card / max-3-copies rules, for tests
 /// that need game start to be allowed.
 Deck _validTestDeck() {
@@ -26,7 +28,7 @@ void main() {
   testWidgets('Main menu shows title and all navigation buttons', (
     WidgetTester tester,
   ) async {
-    await tester.pumpWidget(const AnimalTcgApp());
+    await tester.pumpWidget(AnimalTcgApp(musicPlayer: FakeMusicPlayer()));
 
     expect(find.text('ANIMAL TCG'), findsOneWidget);
     expect(find.text('Play'), findsOneWidget);
@@ -38,7 +40,7 @@ void main() {
   testWidgets('Collection screen shows the card grid and filter chips', (
     WidgetTester tester,
   ) async {
-    await tester.pumpWidget(const AnimalTcgApp());
+    await tester.pumpWidget(AnimalTcgApp(musicPlayer: FakeMusicPlayer()));
 
     await tester.tap(find.text('Collection'));
     await tester.pumpAndSettle();
@@ -50,7 +52,7 @@ void main() {
   testWidgets('Deck Builder screen shows both panels, empty by default', (
     WidgetTester tester,
   ) async {
-    await tester.pumpWidget(const AnimalTcgApp());
+    await tester.pumpWidget(AnimalTcgApp(musicPlayer: FakeMusicPlayer()));
 
     await tester.tap(find.text('Deck Builder'));
     await tester.pumpAndSettle();
@@ -63,7 +65,7 @@ void main() {
   testWidgets('Settings screen shows the toggle switches', (
     WidgetTester tester,
   ) async {
-    await tester.pumpWidget(const AnimalTcgApp());
+    await tester.pumpWidget(AnimalTcgApp(musicPlayer: FakeMusicPlayer()));
 
     await tester.tap(find.text('Settings'));
     await tester.pumpAndSettle();
@@ -75,7 +77,7 @@ void main() {
   testWidgets('Game Lobby blocks starting a game without a valid deck', (
     WidgetTester tester,
   ) async {
-    await tester.pumpWidget(const AnimalTcgApp());
+    await tester.pumpWidget(AnimalTcgApp(musicPlayer: FakeMusicPlayer()));
 
     await tester.tap(find.text('Play'));
     await tester.pumpAndSettle();
@@ -97,7 +99,7 @@ void main() {
   ) async {
     deckLibrary.saveDeck(_validTestDeck());
 
-    await tester.pumpWidget(const AnimalTcgApp());
+    await tester.pumpWidget(AnimalTcgApp(musicPlayer: FakeMusicPlayer()));
 
     await tester.tap(find.text('Play'));
     await tester.pumpAndSettle();

@@ -892,18 +892,24 @@ class _BattlefieldCardSlot extends StatelessWidget {
       animation: attackAnimation,
       child: presentedCard,
       builder: (context, child) {
-        final t = attackAnimation.value;
+        final t = attackAnimation.value.clamp(0.0, 1.0);
         final forward = isOpponent ? 1.0 : -1.0;
+        // Decimal phase boundaries can produce values such as
+        // 1.0000000000000002 on the last frame. Flutter curves assert that
+        // their input is strictly within 0-1, so clamp each normalized phase.
+        final windupProgress = (t / 0.24).clamp(0.0, 1.0);
+        final strikeProgress = ((t - 0.43) / 0.16).clamp(0.0, 1.0);
+        final returnProgress = ((t - 0.59) / 0.41).clamp(0.0, 1.0);
         final jab = switch (t) {
-          < 0.24 => -8 * Curves.easeOut.transform(t / 0.24),
+          < 0.24 => -8 * Curves.easeOut.transform(windupProgress),
           < 0.43 => -8,
-          < 0.59 => -8 + (52 * Curves.easeIn.transform((t - 0.43) / 0.16)),
-          _ => 44 * (1 - Curves.easeOut.transform((t - 0.59) / 0.41)),
+          < 0.59 => -8 + (52 * Curves.easeIn.transform(strikeProgress)),
+          _ => 44 * (1 - Curves.easeOut.transform(returnProgress)),
         };
         final turn = switch (t) {
           < 0.43 => -0.035,
-          < 0.59 => -0.035 + (0.13 * ((t - 0.43) / 0.16)),
-          _ => 0.095 * (1 - ((t - 0.59) / 0.41)),
+          < 0.59 => -0.035 + (0.13 * strikeProgress),
+          _ => 0.095 * (1 - returnProgress),
         };
         final attackLift = isAttacking ? forward * jab : 0.0;
         final shake = isTakingDamage ? sin(t * pi * 10) * (1 - t) * 8 : 0.0;
@@ -925,7 +931,7 @@ class _BattlefieldCardSlot extends StatelessWidget {
               Positioned(
                 top: -18 - (26 * attackAnimation.value),
                 child: Opacity(
-                  opacity: 1 - attackAnimation.value,
+                  opacity: (1 - t).clamp(0.0, 1.0),
                   child: _DamageNumber(damage: damage!),
                 ),
               ),

@@ -159,6 +159,38 @@ void main() {
     },
   );
 
+  testWidgets('card attack return has no transient frame errors on a phone', (
+    WidgetTester tester,
+  ) async {
+    tester.view.physicalSize = const Size(390, 700);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    final engine = _engine();
+    engine.player.battlefield.add(
+      BattlefieldCard(cardCatalog.firstWhere((card) => card.id == 'lion')),
+    );
+    engine.opponent.battlefield.add(
+      BattlefieldCard(cardCatalog.firstWhere((card) => card.id == 'bear')),
+    );
+    await tester.pumpWidget(
+      MaterialApp(home: GameBoardScreen(gameEngine: engine)),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byKey(const ValueKey('player-field-0')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('attack-enemy-0')));
+
+    for (var frame = 0; frame < 50; frame++) {
+      await tester.pump(const Duration(milliseconds: 16));
+      expect(tester.takeException(), isNull, reason: 'attack frame $frame');
+    }
+    await tester.pumpAndSettle();
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets('a card that already attacked cannot be tapped again this turn', (
     WidgetTester tester,
   ) async {

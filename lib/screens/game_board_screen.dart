@@ -53,7 +53,7 @@ class _GameBoardScreenState extends State<GameBoardScreen>
   );
   late final AnimationController _openingController = AnimationController(
     vsync: this,
-    duration: const Duration(milliseconds: 4600),
+    duration: const Duration(milliseconds: 5300),
   );
 
   BattlefieldCard? _attackingCard;
@@ -1069,12 +1069,13 @@ class _OpeningAnnouncement extends StatelessWidget {
     return AnimatedBuilder(
       animation: animation,
       builder: (context, _) {
-        const gameStartEnd = 1400 / 4600;
-        const coinFlipEnd = 3200 / 4600;
+        const gameStartEnd = 1400 / 5300;
+        const coinFlipEnd = 3200 / 5300;
+        const coinHoldEnd = 3900 / 5300;
         final value = animation.value.clamp(0.0, 1.0);
         final phase = value < gameStartEnd
             ? _OpeningPhase.gameStart
-            : value < coinFlipEnd
+            : value < coinHoldEnd
             ? _OpeningPhase.coinFlip
             : _OpeningPhase.result;
         final coinProgress =
@@ -1098,6 +1099,8 @@ class _OpeningAnnouncement extends StatelessWidget {
                 _OpeningPhase.coinFlip => _FlippingCoin(
                   key: const ValueKey('opening-coin-flip'),
                   progress: coinProgress,
+                  landed: value >= coinFlipEnd,
+                  playerWon: playerGoesFirst,
                 ),
                 _OpeningPhase.result => _OpeningCard(
                   key: const ValueKey('opening-result'),
@@ -1118,57 +1121,48 @@ class _OpeningAnnouncement extends StatelessWidget {
 }
 
 class _FlippingCoin extends StatelessWidget {
-  const _FlippingCoin({super.key, required this.progress});
+  const _FlippingCoin({
+    super.key,
+    required this.progress,
+    required this.landed,
+    required this.playerWon,
+  });
 
   final double progress;
+  final bool landed;
+  final bool playerWon;
 
   @override
   Widget build(BuildContext context) {
     final lift = sin(progress * pi) * 70;
-    return Transform.translate(
-      offset: Offset(0, -lift),
-      child: Transform(
-        alignment: Alignment.center,
-        transform: Matrix4.identity()
-          ..setEntry(3, 2, 0.001)
-          ..rotateY(progress * pi * 10),
-        child: const _CoinFace(),
-      ),
-    );
-  }
-}
-
-class _CoinFace extends StatelessWidget {
-  const _CoinFace();
-
-  @override
-  Widget build(BuildContext context) {
     return Column(
       mainAxisSize: MainAxisSize.min,
       children: [
-        Container(
-          width: 118,
-          height: 118,
-          decoration: BoxDecoration(
-            shape: BoxShape.circle,
-            gradient: const RadialGradient(
-              colors: [Color(0xFFFFF3A6), AppColors.goldAccent],
+        Transform.translate(
+          key: const ValueKey('rotating-coin'),
+          offset: Offset(0, -lift),
+          child: Transform(
+            alignment: Alignment.center,
+            transform: Matrix4.identity()
+              ..setEntry(3, 2, 0.001)
+              ..rotateY(progress * pi * 10),
+            child: _CoinFace(
+              icon: landed
+                  ? playerWon
+                        ? Icons.person
+                        : Icons.smart_toy
+                  : Icons.pets,
             ),
-            border: Border.all(color: Colors.white, width: 4),
-            boxShadow: const [
-              BoxShadow(color: Colors.black54, blurRadius: 22, spreadRadius: 3),
-            ],
-          ),
-          child: const Icon(
-            Icons.pets,
-            size: 58,
-            color: AppColors.darkForestGreen,
           ),
         ),
         const SizedBox(height: 24),
-        const Text(
-          'FLIPPING FOR FIRST TURN…',
-          style: TextStyle(
+        Text(
+          landed
+              ? playerWon
+                    ? 'YOU WON THE FLIP!'
+                    : 'OPPONENT WON THE FLIP!'
+              : 'FLIPPING FOR FIRST TURN…',
+          style: const TextStyle(
             color: Colors.white,
             fontSize: 19,
             fontWeight: FontWeight.w800,
@@ -1176,6 +1170,31 @@ class _CoinFace extends StatelessWidget {
           ),
         ),
       ],
+    );
+  }
+}
+
+class _CoinFace extends StatelessWidget {
+  const _CoinFace({required this.icon});
+
+  final IconData icon;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: 118,
+      height: 118,
+      decoration: BoxDecoration(
+        shape: BoxShape.circle,
+        gradient: const RadialGradient(
+          colors: [Color(0xFFFFF3A6), AppColors.goldAccent],
+        ),
+        border: Border.all(color: Colors.white, width: 4),
+        boxShadow: const [
+          BoxShadow(color: Colors.black54, blurRadius: 22, spreadRadius: 3),
+        ],
+      ),
+      child: Icon(icon, size: 58, color: AppColors.darkForestGreen),
     );
   }
 }

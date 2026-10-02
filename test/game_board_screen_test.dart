@@ -63,8 +63,20 @@ void main() {
     await tester.pump();
     expect(find.byKey(const ValueKey('opening-coin-flip')), findsOneWidget);
     expect(find.text('FLIPPING FOR FIRST TURN…'), findsOneWidget);
+    expect(
+      find.descendant(
+        of: find.byKey(const ValueKey('rotating-coin')),
+        matching: find.text('FLIPPING FOR FIRST TURN…'),
+      ),
+      findsNothing,
+    );
 
     await tester.pump(const Duration(milliseconds: 1900));
+    await tester.pump();
+    expect(find.byKey(const ValueKey('opening-coin-flip')), findsOneWidget);
+    expect(find.text('YOU WON THE FLIP!'), findsOneWidget);
+
+    await tester.pump(const Duration(milliseconds: 700));
     await tester.pump();
     expect(find.byKey(const ValueKey('opening-result')), findsOneWidget);
     expect(find.text('YOU GO FIRST!'), findsOneWidget);

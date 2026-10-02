@@ -107,6 +107,10 @@ void main() {
 
     await tester.tap(find.text('Create'));
     await tester.pumpAndSettle();
+    expect(find.text('Choose an opponent'), findsOneWidget);
+
+    await tester.tap(find.text('Play against a bot'));
+    await tester.pumpAndSettle();
     expect(find.text('Game Board'), findsOneWidget);
     expect(find.text('Game Log'), findsOneWidget);
     expect(find.text('End Turn'), findsOneWidget);

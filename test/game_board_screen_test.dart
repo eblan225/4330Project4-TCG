@@ -38,12 +38,16 @@ GameEngine _engine({int opponentHp = 10000}) {
 }
 
 Future<void> _pumpBoard(WidgetTester tester, GameEngine engine) async {
-  await tester.pumpWidget(MaterialApp(home: GameBoardScreen(gameEngine: engine)));
+  await tester.pumpWidget(
+    MaterialApp(home: GameBoardScreen(gameEngine: engine)),
+  );
   await tester.pumpAndSettle();
 }
 
 void main() {
-  testWidgets('shows real HP and resource from the engine', (WidgetTester tester) async {
+  testWidgets('shows real HP and resource from the engine', (
+    WidgetTester tester,
+  ) async {
     final engine = _engine();
     await _pumpBoard(tester, engine);
 
@@ -52,7 +56,9 @@ void main() {
     expect(
       find.descendant(
         of: find.byKey(const ValueKey('player-resource')),
-        matching: find.text('${engine.player.resource}/${engine.player.resourceCap}'),
+        matching: find.text(
+          '${engine.player.resource}/${engine.player.resourceCap}',
+        ),
       ),
       findsOneWidget,
     );
@@ -80,7 +86,9 @@ void main() {
       // Put a known card directly on the battlefield so the attack's
       // damage is predictable, instead of depending on which card a
       // shuffled hand happened to draw.
-      final attacker = BattlefieldCard(cardCatalog.firstWhere((c) => c.id == 'lion'));
+      final attacker = BattlefieldCard(
+        cardCatalog.firstWhere((c) => c.id == 'lion'),
+      );
       engine.player.battlefield.add(attacker);
       await _pumpBoard(tester, engine);
 
@@ -96,40 +104,47 @@ void main() {
     },
   );
 
-  testWidgets('attacking offers a choice when the opponent has a battlefield card', (
-    WidgetTester tester,
-  ) async {
-    final engine = _engine();
-    final attacker = BattlefieldCard(cardCatalog.firstWhere((c) => c.id == 'lion'));
-    engine.player.battlefield.add(attacker);
-    final enemyCreature = BattlefieldCard(cardCatalog.firstWhere((c) => c.id == 'fox'));
-    engine.opponent.battlefield.add(enemyCreature);
-    await _pumpBoard(tester, engine);
+  testWidgets(
+    'attacking offers a choice when the opponent has a battlefield card',
+    (WidgetTester tester) async {
+      final engine = _engine();
+      final attacker = BattlefieldCard(
+        cardCatalog.firstWhere((c) => c.id == 'lion'),
+      );
+      engine.player.battlefield.add(attacker);
+      final enemyCreature = BattlefieldCard(
+        cardCatalog.firstWhere((c) => c.id == 'fox'),
+      );
+      engine.opponent.battlefield.add(enemyCreature);
+      await _pumpBoard(tester, engine);
 
-    await tester.tap(find.byKey(const ValueKey('player-field-0')));
-    await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const ValueKey('player-field-0')));
+      await tester.pumpAndSettle();
 
-    expect(find.text('Attack Opponent Directly'), findsOneWidget);
-    expect(
-      find.descendant(
-        of: find.byType(AlertDialog),
-        matching: find.text(enemyCreature.card.name),
-      ),
-      findsOneWidget,
-    );
+      expect(find.text('Attack Opponent Directly'), findsOneWidget);
+      expect(
+        find.descendant(
+          of: find.byType(AlertDialog),
+          matching: find.text(enemyCreature.card.name),
+        ),
+        findsOneWidget,
+      );
 
-    await tester.tap(find.byKey(const ValueKey('attack-enemy-0')));
-    await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const ValueKey('attack-enemy-0')));
+      await tester.pumpAndSettle();
 
-    // Lion (55 attack) easily defeats Fox (20 HP).
-    expect(engine.opponent.battlefield, isEmpty);
-  });
+      // Lion (55 attack) easily defeats Fox (20 HP).
+      expect(engine.opponent.battlefield, isEmpty);
+    },
+  );
 
   testWidgets('a card that already attacked cannot be tapped again this turn', (
     WidgetTester tester,
   ) async {
     final engine = _engine();
-    final attacker = BattlefieldCard(cardCatalog.firstWhere((c) => c.id == 'fox'));
+    final attacker = BattlefieldCard(
+      cardCatalog.firstWhere((c) => c.id == 'fox'),
+    );
     engine.player.battlefield.add(attacker);
     await _pumpBoard(tester, engine);
 
@@ -141,7 +156,10 @@ void main() {
 
     // The slot is now disabled (dimmed, no onTap), so this tap should
     // do nothing rather than attack a second time.
-    await tester.tap(find.byKey(const ValueKey('player-field-0')), warnIfMissed: false);
+    await tester.tap(
+      find.byKey(const ValueKey('player-field-0')),
+      warnIfMissed: false,
+    );
     await tester.pumpAndSettle();
 
     expect(engine.opponent.hp, hpAfterFirstAttack);
@@ -162,11 +180,13 @@ void main() {
     expect(find.text('Turn 2 • Your Turn'), findsOneWidget);
   });
 
-  testWidgets('defeating the opponent navigates to the results screen', (
+  testWidgets('defeating the opponent shows outcome before match details', (
     WidgetTester tester,
   ) async {
     final engine = _engine(opponentHp: 1);
-    final attacker = BattlefieldCard(cardCatalog.firstWhere((c) => c.id == 'fox'));
+    final attacker = BattlefieldCard(
+      cardCatalog.firstWhere((c) => c.id == 'fox'),
+    );
     engine.player.battlefield.add(attacker);
     await _pumpBoard(tester, engine);
 
@@ -174,6 +194,12 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(engine.isGameOver, isTrue);
+    expect(find.text('YOU WON!'), findsOneWidget);
+    expect(find.text('Game Results'), findsNothing);
+
+    await tester.tap(find.byKey(const ValueKey('view-results')));
+    await tester.pumpAndSettle();
+
     expect(find.text('Game Results'), findsOneWidget);
     expect(find.text('Victory!'), findsOneWidget);
   });

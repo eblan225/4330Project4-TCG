@@ -2,14 +2,12 @@ import 'package:flutter/material.dart';
 
 import '../theme/app_theme.dart';
 
-/// Shown after a match ends. Takes whether the player won so the
-/// banner and icon can change, but there's no real win/loss logic
-/// wired up yet — this is reached from a demo button on the game
-/// board for now.
+/// Shows match details after the player has seen the dedicated outcome screen.
 class GameResultsScreen extends StatelessWidget {
-  const GameResultsScreen({super.key, required this.didWin});
+  const GameResultsScreen({super.key, required this.didWin, this.turnsPlayed});
 
   final bool didWin;
+  final int? turnsPlayed;
 
   @override
   Widget build(BuildContext context) {
@@ -28,7 +26,7 @@ class GameResultsScreen extends StatelessWidget {
               ),
               const SizedBox(height: 16),
               Text(
-                didWin ? 'Victory!' : 'Defeat',
+                didWin ? 'Victory!' : 'Defeat...',
                 style: Theme.of(context).textTheme.headlineLarge,
               ),
               const SizedBox(height: 24),
@@ -36,10 +34,13 @@ class GameResultsScreen extends StatelessWidget {
                 child: Padding(
                   padding: const EdgeInsets.all(16),
                   child: Column(
-                    children: const [
-                      _ResultStatRow(label: 'Turns Played', value: '--'),
-                      _ResultStatRow(label: 'Cards Played', value: '--'),
-                      _ResultStatRow(label: 'Damage Dealt', value: '--'),
+                    children: [
+                      _ResultStatRow(
+                        label: 'Turns Played',
+                        value: turnsPlayed?.toString() ?? '--',
+                      ),
+                      const _ResultStatRow(label: 'Cards Played', value: '--'),
+                      const _ResultStatRow(label: 'Damage Dealt', value: '--'),
                     ],
                   ),
                 ),
@@ -50,7 +51,8 @@ class GameResultsScreen extends StatelessWidget {
                 children: [
                   OutlinedButton(
                     onPressed: () =>
-                        Navigator.of(context).popUntil((route) => route.isFirst),
+                        Navigator.of(context)
+                            .popUntil((route) => route.isFirst),
                     child: const Text('Main Menu'),
                   ),
                   const SizedBox(width: 16),

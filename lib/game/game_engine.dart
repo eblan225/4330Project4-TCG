@@ -18,6 +18,37 @@ class GameRuleViolation implements Exception {
   String toString() => message;
 }
 
+enum OpponentActionType { playedCard, attackedPlayer, finishedTurn }
+
+/// One visible step of the automatic opponent's turn. The UI can request
+/// these one at a time so each play and attack has time to animate.
+class OpponentAction {
+  const OpponentAction._({
+    required this.type,
+    this.card,
+    this.attacker,
+    this.damage = 0,
+  });
+
+  const OpponentAction.played(GameCard card)
+    : this._(type: OpponentActionType.playedCard, card: card);
+
+  const OpponentAction.attacked(BattlefieldCard attacker, int damage)
+    : this._(
+        type: OpponentActionType.attackedPlayer,
+        attacker: attacker,
+        damage: damage,
+      );
+
+  const OpponentAction.finished()
+    : this._(type: OpponentActionType.finishedTurn);
+
+  final OpponentActionType type;
+  final GameCard? card;
+  final BattlefieldCard? attacker;
+  final int damage;
+}
+
 /// Runs one full two-player match: setup, turns, playing cards, and
 /// attacking. This class has no Flutter dependency — it's plain game
 /// logic that a screen reads from and calls into.
@@ -52,9 +83,12 @@ class GameEngine {
     required Deck opponentDeck,
     Random? random,
     bool? forcePlayerFirst,
-  })  : _random = random ?? Random(),
-        player = PlayerState(name: 'Player', deckCards: _expand(playerDeck)),
-        opponent = PlayerState(name: 'Opponent', deckCards: _expand(opponentDeck)) {
+  }) : _random = random ?? Random(),
+       player = PlayerState(name: 'Player', deckCards: _expand(playerDeck)),
+       opponent = PlayerState(
+         name: 'Opponent',
+         deckCards: _expand(opponentDeck),
+       ) {
     _setUpGame(forcePlayerFirst);
   }
 
@@ -81,7 +115,8 @@ class GameEngine {
 
   PlayerState get currentPlayer => isPlayerTurn ? player : opponent;
 
-  PlayerState _otherPlayerOf(PlayerState actor) => actor == player ? opponent : player;
+  PlayerState _otherPlayerOf(PlayerState actor) =>
+      actor == player ? opponent : player;
 
   /// Builds a random, rule-valid 30-card deck from the full card
   /// catalog. Used to give the automatic opponent a deck, since it
@@ -176,7 +211,11 @@ class GameEngine {
   /// [attacker] (belonging to [actor]) attacks [defender], an enemy
   /// battlefield card. Both deal their attack as damage to each
   /// other; defeated cards are removed afterward.
-  void attackCard(PlayerState actor, BattlefieldCard attacker, BattlefieldCard defender) {
+  void attackCard(
+    PlayerState actor,
+    BattlefieldCard attacker,
+    BattlefieldCard defender,
+  ) {
     _assertActorTurn(actor);
     _assertCanAttack(actor, attacker);
     final defendingPlayer = _otherPlayerOf(actor);
@@ -218,10 +257,14 @@ class GameEngine {
 
   void _assertCanAttack(PlayerState actor, BattlefieldCard attacker) {
     if (!actor.battlefield.contains(attacker)) {
-      throw GameRuleViolation('That card is not on ${actor.name}\'s battlefield.');
+      throw GameRuleViolation(
+        'That card is not on ${actor.name}\'s battlefield.',
+      );
     }
     if (attacker.hasAttackedThisTurn) {
-      throw GameRuleViolation('${attacker.card.name} has already attacked this turn.');
+      throw GameRuleViolation(
+        '${attacker.card.name} has already attacked this turn.',
+      );
     }
   }
 
@@ -242,14 +285,48 @@ class GameEngine {
   void endTurn() {
     if (isGameOver) return;
 
-    _log('${currentPlayer.name} ends their turn.');
-    isPlayerTurn = !isPlayerTurn;
-    if (isPlayerTurn) turnNumber++;
-    _beginTurn();
-
-    if (!isPlayerTurn && !isGameOver) {
-      _runOpponentTurn();
+    beginOpponentTurn();
+    while (!isPlayerTurn && !isGameOver) {
+      performNextOpponentAction();
     }
+  }
+
+  /// Hands control to the opponent without immediately resolving its whole
+  /// turn. This is used by the animated board; [endTurn] remains the
+  /// convenient synchronous version for rules tests and non-visual callers.
+  void beginOpponentTurn() {
+    if (isGameOver || !isPlayerTurn) return;
+
+    _log('${currentPlayer.name} ends their turn.');
+    isPlayerTurn = false;
+    _beginTurn();
+  }
+
+  /// Resolves exactly one bot play, attack, or end-of-turn transition.
+  OpponentAction performNextOpponentAction() {
+    if (isGameOver || isPlayerTurn) return const OpponentAction.finished();
+
+    for (final card in List<GameCard>.from(opponent.hand)) {
+      if (opponent.resource >= card.attackCost &&
+          opponent.battlefield.length < maxBattlefieldSize) {
+        playCard(opponent, card);
+        return OpponentAction.played(card);
+      }
+    }
+
+    for (final attacker in List<BattlefieldCard>.from(opponent.battlefield)) {
+      if (!attacker.hasAttackedThisTurn) {
+        final damage = attacker.card.attack;
+        attackPlayer(opponent, attacker);
+        return OpponentAction.attacked(attacker, damage);
+      }
+    }
+
+    _log('${currentPlayer.name} ends their turn.');
+    isPlayerTurn = true;
+    turnNumber++;
+    _beginTurn();
+    return const OpponentAction.finished();
   }
 
   /// A very simple automatic opponent: play whatever it can afford,
@@ -257,28 +334,8 @@ class GameEngine {
   /// enough to demonstrate a full two-player match without building
   /// real multiplayer or AI.
   void _runOpponentTurn() {
-    var playedSomething = true;
-    while (playedSomething && !isGameOver) {
-      playedSomething = false;
-      for (final card in List<GameCard>.from(opponent.hand)) {
-        if (opponent.resource >= card.attackCost &&
-            opponent.battlefield.length < maxBattlefieldSize) {
-          playCard(opponent, card);
-          playedSomething = true;
-          break;
-        }
-      }
-    }
-
-    for (final attacker in List<BattlefieldCard>.from(opponent.battlefield)) {
-      if (isGameOver) break;
-      if (!attacker.hasAttackedThisTurn) {
-        attackPlayer(opponent, attacker);
-      }
-    }
-
-    if (!isGameOver) {
-      endTurn();
+    while (!isPlayerTurn && !isGameOver) {
+      performNextOpponentAction();
     }
   }
 

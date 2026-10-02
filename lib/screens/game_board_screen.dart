@@ -9,7 +9,7 @@ import '../models/card.dart';
 import '../theme/app_theme.dart';
 import '../widgets/section_panel.dart';
 import '../widgets/trading_card.dart';
-import 'game_results_screen.dart';
+import 'game_outcome_screen.dart';
 
 /// Plays a full two-player match using [GameEngine]. There's no
 /// multiplayer yet, so the opponent is driven by the engine's simple
@@ -32,25 +32,78 @@ class GameBoardScreen extends StatefulWidget {
   State<GameBoardScreen> createState() => _GameBoardScreenState();
 }
 
-class _GameBoardScreenState extends State<GameBoardScreen> {
+class _GameBoardScreenState extends State<GameBoardScreen>
+    with TickerProviderStateMixin {
   late final GameEngine _engine = widget.gameEngine ?? _buildEngine();
+  late final AnimationController _turnController = AnimationController(
+    vsync: this,
+    duration: const Duration(milliseconds: 1500),
+  );
+  late final AnimationController _attackController = AnimationController(
+    vsync: this,
+    duration: const Duration(milliseconds: 720),
+  );
+  late final AnimationController _summonController = AnimationController(
+    vsync: this,
+    duration: const Duration(milliseconds: 420),
+  );
+
+  BattlefieldCard? _attackingCard;
+  BattlefieldCard? _damagedCard;
+  int? _floatingDamage;
+  bool _opponentTakingDamage = false;
+  bool _playerTakingDamage = false;
+  bool _isBusy = false;
+  BattlefieldCard? _enteringCard;
+  bool _navigatingToOutcome = false;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback(
+      (_) => _showTurnAnnouncement(),
+    );
+  }
+
+  @override
+  void dispose() {
+    _turnController.dispose();
+    _attackController.dispose();
+    _summonController.dispose();
+    super.dispose();
+  }
 
   GameEngine _buildEngine() {
     final random = Random();
     final playerDeck = deckLibrary.decks.firstWhere((deck) => deck.isValid);
     final opponentDeck = GameEngine.randomDeck(random);
-    return GameEngine(playerDeck: playerDeck, opponentDeck: opponentDeck, random: random);
+    return GameEngine(
+      playerDeck: playerDeck,
+      opponentDeck: opponentDeck,
+      random: random,
+    );
   }
 
   void _afterAction() {
     setState(() {});
-    if (_engine.isGameOver) {
+    if (_engine.isGameOver && !_navigatingToOutcome) {
+      _navigatingToOutcome = true;
       final didWin = _engine.winner == _engine.player;
       Navigator.push(
         context,
-        MaterialPageRoute(builder: (_) => GameResultsScreen(didWin: didWin)),
+        MaterialPageRoute(
+          builder: (_) => GameOutcomeScreen(
+            didWin: didWin,
+            turnsPlayed: _engine.turnNumber,
+          ),
+        ),
       );
     }
+  }
+
+  Future<void> _showTurnAnnouncement() async {
+    if (!mounted) return;
+    await _turnController.forward(from: 0);
   }
 
   void _showError(String message) {
@@ -59,12 +112,22 @@ class _GameBoardScreenState extends State<GameBoardScreen> {
       ..showSnackBar(SnackBar(content: Text(message)));
   }
 
-  void _playFromHand(GameCard card) {
+  Future<void> _playFromHand(GameCard card) async {
+    if (_isBusy) return;
     try {
+      _isBusy = true;
       _engine.playCard(_engine.player, card);
-      _afterAction();
+      setState(() => _enteringCard = _engine.player.battlefield.last);
+      await _summonController.forward(from: 0);
+      if (mounted) setState(() => _enteringCard = null);
     } on GameRuleViolation catch (e) {
       _showError(e.message);
+    } finally {
+      if (mounted) {
+        setState(() => _isBusy = false);
+      } else {
+        _isBusy = false;
+      }
     }
   }
 
@@ -94,112 +157,241 @@ class _GameBoardScreenState extends State<GameBoardScreen> {
     );
   }
 
-  void _attackPlayer(BattlefieldCard attacker) {
+  Future<void> _attackPlayer(BattlefieldCard attacker) async {
+    if (_isBusy) return;
     try {
+      _isBusy = true;
+      setState(() {
+        _attackingCard = attacker;
+        _opponentTakingDamage = true;
+        _floatingDamage = attacker.card.attack;
+      });
+      await _attackController.forward(from: 0);
       _engine.attackPlayer(_engine.player, attacker);
+      if (!mounted) return;
+      setState(() {
+        _attackingCard = null;
+        _opponentTakingDamage = false;
+        _floatingDamage = null;
+      });
       _afterAction();
     } on GameRuleViolation catch (e) {
       _showError(e.message);
+    } finally {
+      if (mounted) {
+        setState(() => _isBusy = false);
+      } else {
+        _isBusy = false;
+      }
     }
   }
 
-  void _attackCard(BattlefieldCard attacker, BattlefieldCard defender) {
+  Future<void> _attackCard(
+    BattlefieldCard attacker,
+    BattlefieldCard defender,
+  ) async {
+    if (_isBusy) return;
     try {
+      _isBusy = true;
+      setState(() {
+        _attackingCard = attacker;
+        _damagedCard = defender;
+        _floatingDamage = attacker.card.attack;
+      });
+      await _attackController.forward(from: 0);
       _engine.attackCard(_engine.player, attacker, defender);
+      if (!mounted) return;
+      setState(() {
+        _attackingCard = null;
+        _damagedCard = null;
+        _floatingDamage = null;
+      });
       _afterAction();
     } on GameRuleViolation catch (e) {
       _showError(e.message);
+    } finally {
+      if (mounted) {
+        setState(() => _isBusy = false);
+      } else {
+        _isBusy = false;
+      }
     }
   }
 
-  void _endTurn() {
-    _engine.endTurn();
-    _afterAction();
+  Future<void> _endTurn() async {
+    if (_isBusy || _engine.isGameOver) return;
+    _isBusy = true;
+    _engine.beginOpponentTurn();
+    setState(() {});
+    await _showTurnAnnouncement();
+
+    while (mounted && !_engine.isPlayerTurn && !_engine.isGameOver) {
+      final action = _engine.performNextOpponentAction();
+      await _presentOpponentAction(action);
+    }
+
+    if (!mounted) return;
+    if (_engine.isGameOver) {
+      _afterAction();
+      return;
+    }
+    setState(() {});
+    await _showTurnAnnouncement();
+    _isBusy = false;
+    if (mounted) setState(() {});
+  }
+
+  /// Presents an action performed by the player across the table. The source
+  /// can be the local AI today or a network message from a person later.
+  Future<void> _presentOpponentAction(OpponentAction action) async {
+    switch (action.type) {
+      case OpponentActionType.playedCard:
+        setState(() => _enteringCard = _engine.opponent.battlefield.last);
+        await _summonController.forward(from: 0);
+        if (mounted) setState(() => _enteringCard = null);
+      case OpponentActionType.attackedPlayer:
+        setState(() {
+          _attackingCard = action.attacker;
+          _playerTakingDamage = true;
+          _floatingDamage = action.damage;
+        });
+        await _attackController.forward(from: 0);
+        if (mounted) {
+          setState(() {
+            _attackingCard = null;
+            _playerTakingDamage = false;
+            _floatingDamage = null;
+          });
+        }
+      case OpponentActionType.finishedTurn:
+        if (mounted) setState(() {});
+    }
+    await Future<void>.delayed(const Duration(milliseconds: 180));
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(title: const Text('Game Board')),
-      body: Padding(
-        padding: const EdgeInsets.all(12),
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Expanded(
-              flex: 4,
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  // --- Opponent area ---
-                  _PlayerStatusBar(
-                    label: 'Opponent',
-                    hp: _engine.opponent.hp,
-                    resource: _engine.opponent.resource,
-                    resourceCap: _engine.opponent.resourceCap,
+      body: Stack(
+        children: [
+          Padding(
+            padding: const EdgeInsets.all(12),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Expanded(
+                  flex: 4,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      // --- Opponent area ---
+                      _PlayerStatusBar(
+                        label: 'Opponent',
+                        hp: _engine.opponent.hp,
+                        resource: _engine.opponent.resource,
+                        resourceCap: _engine.opponent.resourceCap,
+                        damageAnimation: _opponentTakingDamage
+                            ? _attackController
+                            : null,
+                        damage: _opponentTakingDamage ? _floatingDamage : null,
+                      ),
+                      const SizedBox(height: 8),
+                      _HandRow(
+                        label: 'Opponent Hand',
+                        count: _engine.opponent.hand.length,
+                      ),
+                      const SizedBox(height: 8),
+                      // --- Center battlefield ---
+                      Expanded(
+                        flex: 3,
+                        child: _BattlefieldPanel(
+                          opponentField: _engine.opponent.battlefield,
+                          playerField: _engine.player.battlefield,
+                          turnNumber: _engine.turnNumber,
+                          isPlayerTurn: _engine.isPlayerTurn,
+                          onTapPlayerCard: _attackWithCard,
+                          attackAnimation: _attackController,
+                          attackingCard: _attackingCard,
+                          damagedCard: _damagedCard,
+                          damage: _damagedCard == null ? null : _floatingDamage,
+                          summonAnimation: _summonController,
+                          enteringCard: _enteringCard,
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      // --- Player area ---
+                      _HandRow(
+                        label: 'Player Hand',
+                        cards: _engine.player.hand,
+                        canPlay:
+                            _engine.isPlayerTurn &&
+                            !_engine.isGameOver &&
+                            !_isBusy,
+                        resource: _engine.player.resource,
+                        battlefieldFull:
+                            _engine.player.battlefield.length >=
+                            GameEngine.maxBattlefieldSize,
+                        onTapCard: _playFromHand,
+                      ),
+                      const SizedBox(height: 8),
+                      _PlayerStatusBar(
+                        label: 'Player',
+                        hp: _engine.player.hp,
+                        resource: _engine.player.resource,
+                        resourceCap: _engine.player.resourceCap,
+                        damageAnimation: _playerTakingDamage
+                            ? _attackController
+                            : null,
+                        damage: _playerTakingDamage ? _floatingDamage : null,
+                        trailing: ElevatedButton.icon(
+                          onPressed:
+                              _engine.isPlayerTurn &&
+                                  !_engine.isGameOver &&
+                                  !_isBusy
+                              ? _endTurn
+                              : null,
+                          icon: const Icon(Icons.skip_next),
+                          label: const Text('End Turn'),
+                        ),
+                      ),
+                    ],
                   ),
-                  const SizedBox(height: 8),
-                  _HandRow(label: 'Opponent Hand', count: _engine.opponent.hand.length),
-                  const SizedBox(height: 8),
-                  // --- Center battlefield ---
-                  Expanded(
-                    flex: 3,
-                    child: _BattlefieldPanel(
-                      opponentField: _engine.opponent.battlefield,
-                      playerField: _engine.player.battlefield,
-                      turnNumber: _engine.turnNumber,
-                      isPlayerTurn: _engine.isPlayerTurn,
-                      onTapPlayerCard: _attackWithCard,
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  // --- Player area ---
-                  _HandRow(
-                    label: 'Player Hand',
-                    cards: _engine.player.hand,
-                    canPlay: _engine.isPlayerTurn && !_engine.isGameOver,
-                    resource: _engine.player.resource,
-                    battlefieldFull:
-                        _engine.player.battlefield.length >= GameEngine.maxBattlefieldSize,
-                    onTapCard: _playFromHand,
-                  ),
-                  const SizedBox(height: 8),
-                  _PlayerStatusBar(
-                    label: 'Player',
-                    hp: _engine.player.hp,
-                    resource: _engine.player.resource,
-                    resourceCap: _engine.player.resourceCap,
-                    trailing: ElevatedButton.icon(
-                      onPressed:
-                          _engine.isPlayerTurn && !_engine.isGameOver ? _endTurn : null,
-                      icon: const Icon(Icons.skip_next),
-                      label: const Text('End Turn'),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(width: 12),
-            SizedBox(
-              width: 220,
-              child: SectionPanel(
-                title: 'Game Log',
-                icon: Icons.menu_book,
-                child: ListView.builder(
-                  reverse: true,
-                  itemCount: _engine.log.length,
-                  itemBuilder: (context, index) {
-                    final entry = _engine.log[_engine.log.length - 1 - index];
-                    return Padding(
-                      padding: const EdgeInsets.symmetric(vertical: 4),
-                      child: Text(entry, style: const TextStyle(fontSize: 13)),
-                    );
-                  },
                 ),
-              ),
+                const SizedBox(width: 12),
+                SizedBox(
+                  width: 220,
+                  child: SectionPanel(
+                    title: 'Game Log',
+                    icon: Icons.menu_book,
+                    child: ListView.builder(
+                      reverse: true,
+                      itemCount: _engine.log.length,
+                      itemBuilder: (context, index) {
+                        final entry =
+                            _engine.log[_engine.log.length - 1 - index];
+                        return Padding(
+                          padding: const EdgeInsets.symmetric(vertical: 4),
+                          child: Text(
+                            entry,
+                            style: const TextStyle(fontSize: 13),
+                          ),
+                        );
+                      },
+                    ),
+                  ),
+                ),
+              ],
             ),
-          ],
-        ),
+          ),
+          IgnorePointer(
+            child: _TurnAnnouncement(
+              animation: _turnController,
+              turnNumber: _engine.turnNumber,
+              isPlayerTurn: _engine.isPlayerTurn,
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -212,6 +404,8 @@ class _PlayerStatusBar extends StatelessWidget {
     required this.resource,
     required this.resourceCap,
     this.trailing,
+    this.damageAnimation,
+    this.damage,
   });
 
   final String label;
@@ -219,43 +413,83 @@ class _PlayerStatusBar extends StatelessWidget {
   final int resource;
   final int resourceCap;
   final Widget? trailing;
+  final Animation<double>? damageAnimation;
+  final int? damage;
 
   @override
   Widget build(BuildContext context) {
-    return Container(
+    final content = Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
       decoration: BoxDecoration(
         color: AppColors.surface,
         borderRadius: BorderRadius.circular(10),
         border: Border.all(color: AppColors.earthBrown.withValues(alpha: 0.3)),
       ),
-      child: Row(
+      child: Stack(
+        clipBehavior: Clip.none,
         children: [
-          Text(label, style: const TextStyle(fontWeight: FontWeight.bold)),
-          const SizedBox(width: 12),
-          _StatPill(
-            key: ValueKey('${label.toLowerCase()}-hp'),
-            icon: Icons.favorite,
-            color: Colors.redAccent,
-            text: '$hp',
+          Row(
+            children: [
+              Text(label, style: const TextStyle(fontWeight: FontWeight.bold)),
+              const SizedBox(width: 12),
+              _StatPill(
+                key: ValueKey('${label.toLowerCase()}-hp'),
+                icon: Icons.favorite,
+                color: Colors.redAccent,
+                text: '$hp',
+              ),
+              const SizedBox(width: 8),
+              _StatPill(
+                key: ValueKey('${label.toLowerCase()}-resource'),
+                icon: Icons.bolt,
+                color: Colors.blueAccent,
+                text: '$resource/$resourceCap',
+              ),
+              const Spacer(),
+              ?trailing,
+            ],
           ),
-          const SizedBox(width: 8),
-          _StatPill(
-            key: ValueKey('${label.toLowerCase()}-resource'),
-            icon: Icons.bolt,
-            color: Colors.blueAccent,
-            text: '$resource/$resourceCap',
-          ),
-          const Spacer(),
-          ?trailing,
+          if (damageAnimation != null && damage != null)
+            Positioned(
+              right: 24,
+              top: -40,
+              child: AnimatedBuilder(
+                animation: damageAnimation!,
+                builder: (context, child) => Transform.translate(
+                  offset: Offset(0, -28 * damageAnimation!.value),
+                  child: Opacity(
+                    opacity: 1 - damageAnimation!.value,
+                    child: child,
+                  ),
+                ),
+                child: _DamageNumber(damage: damage!),
+              ),
+            ),
         ],
       ),
+    );
+    if (damageAnimation == null) return content;
+    return AnimatedBuilder(
+      animation: damageAnimation!,
+      child: content,
+      builder: (context, child) {
+        final shake =
+            sin(damageAnimation!.value * pi * 8) *
+            (1 - damageAnimation!.value) *
+            7;
+        return Transform.translate(offset: Offset(shake, 0), child: child);
+      },
     );
   }
 }
 
 class _StatPill extends StatelessWidget {
-  const _StatPill({super.key, required this.icon, required this.color, required this.text});
+  const _StatPill({
+    super.key,
+    required this.icon,
+    required this.color,
+    required this.text,
+  });
 
   final IconData icon;
   final Color color;
@@ -274,7 +508,10 @@ class _StatPill extends StatelessWidget {
         children: [
           Icon(icon, size: 16, color: color),
           const SizedBox(width: 4),
-          Text(text, style: TextStyle(fontWeight: FontWeight.bold, color: color)),
+          Text(
+            text,
+            style: TextStyle(fontWeight: FontWeight.bold, color: color),
+          ),
         ],
       ),
     );
@@ -326,7 +563,8 @@ class _HandRow extends StatelessWidget {
                   return const TradingCardView(faceDown: true, width: 60);
                 }
                 final card = cardList[index];
-                final affordable = canPlay && resource >= card.attackCost && !battlefieldFull;
+                final affordable =
+                    canPlay && resource >= card.attackCost && !battlefieldFull;
                 return GestureDetector(
                   key: ValueKey('hand-$index'),
                   onTap: affordable ? () => onTapCard?.call(card) : null,
@@ -353,6 +591,12 @@ class _BattlefieldPanel extends StatelessWidget {
     required this.turnNumber,
     required this.isPlayerTurn,
     required this.onTapPlayerCard,
+    required this.attackAnimation,
+    required this.summonAnimation,
+    this.attackingCard,
+    this.damagedCard,
+    this.damage,
+    this.enteringCard,
   });
 
   final List<BattlefieldCard> opponentField;
@@ -360,6 +604,12 @@ class _BattlefieldPanel extends StatelessWidget {
   final int turnNumber;
   final bool isPlayerTurn;
   final ValueChanged<BattlefieldCard> onTapPlayerCard;
+  final Animation<double> attackAnimation;
+  final Animation<double> summonAnimation;
+  final BattlefieldCard? attackingCard;
+  final BattlefieldCard? damagedCard;
+  final int? damage;
+  final BattlefieldCard? enteringCard;
 
   @override
   Widget build(BuildContext context) {
@@ -390,12 +640,20 @@ class _BattlefieldPanel extends StatelessWidget {
               keyPrefix: 'opponent-field',
               cards: opponentField,
               isOpponent: true,
+              attackAnimation: attackAnimation,
+              summonAnimation: summonAnimation,
+              enteringCard: enteringCard,
+              damagedCard: damagedCard,
+              damage: damage,
             ),
           ),
           const SizedBox(height: 6),
           Align(
             alignment: Alignment.center,
-            child: _TurnBanner(turnNumber: turnNumber, isPlayerTurn: isPlayerTurn),
+            child: _TurnBanner(
+              turnNumber: turnNumber,
+              isPlayerTurn: isPlayerTurn,
+            ),
           ),
           const SizedBox(height: 6),
           Expanded(
@@ -405,6 +663,10 @@ class _BattlefieldPanel extends StatelessWidget {
               cards: playerField,
               isOpponent: false,
               onTapCard: isPlayerTurn ? onTapPlayerCard : null,
+              attackAnimation: attackAnimation,
+              summonAnimation: summonAnimation,
+              enteringCard: enteringCard,
+              attackingCard: attackingCard,
             ),
           ),
         ],
@@ -420,7 +682,12 @@ class _FieldRow extends StatelessWidget {
     required this.cards,
     required this.isOpponent,
     this.onTapCard,
-    this.slotCount = 5,
+    required this.attackAnimation,
+    required this.summonAnimation,
+    this.attackingCard,
+    this.damagedCard,
+    this.damage,
+    this.enteringCard,
   });
 
   final String label;
@@ -428,26 +695,45 @@ class _FieldRow extends StatelessWidget {
   final List<BattlefieldCard> cards;
   final bool isOpponent;
   final ValueChanged<BattlefieldCard>? onTapCard;
-  final int slotCount;
+  final Animation<double> attackAnimation;
+  final Animation<double> summonAnimation;
+  final BattlefieldCard? attackingCard;
+  final BattlefieldCard? damagedCard;
+  final int? damage;
+  final BattlefieldCard? enteringCard;
 
   @override
   Widget build(BuildContext context) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(label, style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 12)),
+        Text(
+          label,
+          style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 12),
+        ),
         const SizedBox(height: 4),
         Expanded(
           child: Row(
             mainAxisAlignment: MainAxisAlignment.spaceEvenly,
             children: [
-              for (var i = 0; i < slotCount; i++)
+              for (var i = 0; i < GameEngine.maxBattlefieldSize; i++)
                 _BattlefieldCardSlot(
                   key: ValueKey('$keyPrefix-$i'),
                   index: i + 1,
                   battlefieldCard: i < cards.length ? cards[i] : null,
                   isOpponent: isOpponent,
                   onTap: i < cards.length ? onTapCard : null,
+                  attackAnimation: attackAnimation,
+                  summonAnimation: summonAnimation,
+                  isAttacking:
+                      i < cards.length && identical(cards[i], attackingCard),
+                  isEntering:
+                      i < cards.length && identical(cards[i], enteringCard),
+                  isTakingDamage:
+                      i < cards.length && identical(cards[i], damagedCard),
+                  damage: i < cards.length && identical(cards[i], damagedCard)
+                      ? damage
+                      : null,
                 ),
             ],
           ),
@@ -468,12 +754,24 @@ class _BattlefieldCardSlot extends StatelessWidget {
     required this.battlefieldCard,
     required this.isOpponent,
     this.onTap,
+    required this.attackAnimation,
+    required this.summonAnimation,
+    this.isAttacking = false,
+    this.isTakingDamage = false,
+    this.isEntering = false,
+    this.damage,
   });
 
   final int index;
   final BattlefieldCard? battlefieldCard;
   final bool isOpponent;
   final ValueChanged<BattlefieldCard>? onTap;
+  final Animation<double> attackAnimation;
+  final Animation<double> summonAnimation;
+  final bool isAttacking;
+  final bool isTakingDamage;
+  final bool isEntering;
+  final int? damage;
 
   static const double _cardWidth = 88;
 
@@ -487,7 +785,7 @@ class _BattlefieldCardSlot extends StatelessWidget {
     final haloColor = isOpponent ? Colors.redAccent : AppColors.forestGreen;
     final canTap = onTap != null && !card.hasAttackedThisTurn;
 
-    return GestureDetector(
+    final cardWidget = GestureDetector(
       onTap: canTap ? () => onTap!(card) : null,
       child: Opacity(
         opacity: card.hasAttackedThisTurn ? 0.5 : 1,
@@ -496,7 +794,10 @@ class _BattlefieldCardSlot extends StatelessWidget {
           decoration: BoxDecoration(
             color: haloColor.withValues(alpha: 0.12),
             borderRadius: BorderRadius.circular(10),
-            border: Border.all(color: haloColor.withValues(alpha: 0.6), width: 1.5),
+            border: Border.all(
+              color: haloColor.withValues(alpha: 0.6),
+              width: 1.5,
+            ),
           ),
           child: TradingCardView(
             data: card.card,
@@ -505,6 +806,71 @@ class _BattlefieldCardSlot extends StatelessWidget {
           ),
         ),
       ),
+    );
+    final presentedCard = isEntering
+        ? AnimatedBuilder(
+            animation: summonAnimation,
+            child: cardWidget,
+            builder: (context, child) {
+              final t = Curves.easeOutBack.transform(summonAnimation.value);
+              return Opacity(
+                opacity: summonAnimation.value.clamp(0, 1),
+                child: Transform.translate(
+                  offset: Offset(0, (isOpponent ? -34 : 34) * (1 - t)),
+                  child: Transform.scale(
+                    scale: 0.72 + (0.28 * t),
+                    child: child,
+                  ),
+                ),
+              );
+            },
+          )
+        : cardWidget;
+    if (!isAttacking && !isTakingDamage) return presentedCard;
+    return AnimatedBuilder(
+      animation: attackAnimation,
+      child: presentedCard,
+      builder: (context, child) {
+        final t = attackAnimation.value;
+        final forward = isOpponent ? 1.0 : -1.0;
+        final jab = switch (t) {
+          < 0.24 => -8 * Curves.easeOut.transform(t / 0.24),
+          < 0.43 => -8,
+          < 0.59 => -8 + (52 * Curves.easeIn.transform((t - 0.43) / 0.16)),
+          _ => 44 * (1 - Curves.easeOut.transform((t - 0.59) / 0.41)),
+        };
+        final turn = switch (t) {
+          < 0.43 => -0.035,
+          < 0.59 => -0.035 + (0.13 * ((t - 0.43) / 0.16)),
+          _ => 0.095 * (1 - ((t - 0.59) / 0.41)),
+        };
+        final attackLift = isAttacking ? forward * jab : 0.0;
+        final shake = isTakingDamage ? sin(t * pi * 10) * (1 - t) * 8 : 0.0;
+        return Stack(
+          clipBehavior: Clip.none,
+          alignment: Alignment.center,
+          children: [
+            Transform.translate(
+              offset: Offset(shake, attackLift),
+              child: Transform.rotate(
+                angle: isAttacking ? turn : 0,
+                child: Transform.scale(
+                  scale: isAttacking ? 1 + (0.07 * (jab.abs() / 44)) : 1,
+                  child: child,
+                ),
+              ),
+            ),
+            if (isTakingDamage && damage != null)
+              Positioned(
+                top: -18 - (26 * attackAnimation.value),
+                child: Opacity(
+                  opacity: 1 - attackAnimation.value,
+                  child: _DamageNumber(damage: damage!),
+                ),
+              ),
+          ],
+        );
+      },
     );
   }
 }
@@ -521,7 +887,10 @@ class _EmptySlot extends StatelessWidget {
       width: width,
       height: width * 1.4,
       decoration: BoxDecoration(
-        border: Border.all(color: AppColors.earthBrown.withValues(alpha: 0.3), width: 1.5),
+        border: Border.all(
+          color: AppColors.earthBrown.withValues(alpha: 0.3),
+          width: 1.5,
+        ),
         borderRadius: BorderRadius.circular(8),
         color: AppColors.forestGreen.withValues(alpha: 0.05),
       ),
@@ -554,7 +923,111 @@ class _TurnBanner extends StatelessWidget {
       ),
       child: Text(
         'Turn $turnNumber • ${isPlayerTurn ? "Your Turn" : "Opponent's Turn"}',
-        style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+        style: const TextStyle(
+          color: Colors.white,
+          fontWeight: FontWeight.bold,
+        ),
+      ),
+    );
+  }
+}
+
+class _DamageNumber extends StatelessWidget {
+  const _DamageNumber({required this.damage});
+
+  final int damage;
+
+  @override
+  Widget build(BuildContext context) {
+    return Text(
+      '-$damage',
+      key: const ValueKey('damage-indicator'),
+      style: const TextStyle(
+        color: Colors.redAccent,
+        fontSize: 24,
+        fontWeight: FontWeight.w900,
+        shadows: [
+          Shadow(color: Colors.white, blurRadius: 5),
+          Shadow(color: Colors.black54, blurRadius: 8),
+        ],
+      ),
+    );
+  }
+}
+
+/// Slides across the whole board, pauses in the center, then clears the view.
+class _TurnAnnouncement extends StatelessWidget {
+  const _TurnAnnouncement({
+    required this.animation,
+    required this.turnNumber,
+    required this.isPlayerTurn,
+  });
+
+  final Animation<double> animation;
+  final int turnNumber;
+  final bool isPlayerTurn;
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedBuilder(
+      animation: animation,
+      builder: (context, child) {
+        final value = animation.value;
+        final x = switch (value) {
+          < 0.32 => -1.35 + (value / 0.32) * 1.35,
+          < 0.68 => 0.0,
+          _ => ((value - 0.68) / 0.32) * 1.35,
+        };
+        final opacity = value < 0.12
+            ? value / 0.12
+            : value > 0.88
+            ? (1 - value) / 0.12
+            : 1.0;
+        return FractionalTranslation(
+          translation: Offset(x, 0),
+          child: Opacity(opacity: opacity.clamp(0, 1), child: child),
+        );
+      },
+      child: Center(
+        child: Container(
+          key: const ValueKey('turn-announcement'),
+          padding: const EdgeInsets.symmetric(horizontal: 42, vertical: 18),
+          decoration: BoxDecoration(
+            gradient: const LinearGradient(
+              colors: [AppColors.darkForestGreen, AppColors.forestGreen],
+            ),
+            borderRadius: BorderRadius.circular(18),
+            border: Border.all(color: AppColors.goldAccent, width: 2),
+            boxShadow: const [
+              BoxShadow(
+                color: Colors.black45,
+                blurRadius: 24,
+                offset: Offset(0, 8),
+              ),
+            ],
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                isPlayerTurn ? 'YOUR TURN' : "OPPONENT'S TURN",
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 28,
+                  fontWeight: FontWeight.w900,
+                  letterSpacing: 2,
+                ),
+              ),
+              Text(
+                'Turn $turnNumber',
+                style: const TextStyle(
+                  color: AppColors.goldAccent,
+                  fontSize: 15,
+                ),
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }

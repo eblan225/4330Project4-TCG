@@ -52,9 +52,14 @@ class GameEngine {
     required Deck opponentDeck,
     Random? random,
     bool? forcePlayerFirst,
-  })  : _random = random ?? Random(),
-        player = PlayerState(name: 'Player', deckCards: _expand(playerDeck)),
-        opponent = PlayerState(name: 'Opponent', deckCards: _expand(opponentDeck)) {
+    this.autoRunOpponent = true,
+  }) : startingDeck = playerDeck.copy(),
+       _random = random ?? Random(),
+       player = PlayerState(name: 'Player', deckCards: _expand(playerDeck)),
+       opponent = PlayerState(
+         name: 'Opponent',
+         deckCards: _expand(opponentDeck),
+       ) {
     _setUpGame(forcePlayerFirst);
   }
 
@@ -63,6 +68,11 @@ class GameEngine {
   static const int maxResourceCap = 10;
   static const int maxBattlefieldSize = 5;
 
+  final Deck startingDeck;
+  bool autoRunOpponent;
+  int playerTurns = 0;
+  int cardsPlayed = 0;
+  int damageDealt = 0;
   final Random _random;
   final PlayerState player;
   final PlayerState opponent;
@@ -81,7 +91,8 @@ class GameEngine {
 
   PlayerState get currentPlayer => isPlayerTurn ? player : opponent;
 
-  PlayerState _otherPlayerOf(PlayerState actor) => actor == player ? opponent : player;
+  PlayerState _otherPlayerOf(PlayerState actor) =>
+      actor == player ? opponent : player;
 
   /// Builds a random, rule-valid 30-card deck from the full card
   /// catalog. Used to give the automatic opponent a deck, since it
@@ -123,13 +134,14 @@ class GameEngine {
     _log('${currentPlayer.name} goes first.');
     _beginTurn();
 
-    if (!isPlayerTurn) {
+    if (!isPlayerTurn && autoRunOpponent) {
       _runOpponentTurn();
     }
   }
 
   void _beginTurn() {
     final actor = currentPlayer;
+    if (actor == player) playerTurns++;
     for (final battlefieldCard in actor.battlefield) {
       battlefieldCard.hasAttackedThisTurn = false;
     }
@@ -167,6 +179,7 @@ class GameEngine {
       throw GameRuleViolation("${actor.name}'s battlefield is full.");
     }
 
+    if (actor == player) cardsPlayed++;
     actor.hand.remove(card);
     actor.resource -= card.attackCost;
     actor.battlefield.add(BattlefieldCard(card));
@@ -176,7 +189,11 @@ class GameEngine {
   /// [attacker] (belonging to [actor]) attacks [defender], an enemy
   /// battlefield card. Both deal their attack as damage to each
   /// other; defeated cards are removed afterward.
-  void attackCard(PlayerState actor, BattlefieldCard attacker, BattlefieldCard defender) {
+  void attackCard(
+    PlayerState actor,
+    BattlefieldCard attacker,
+    BattlefieldCard defender,
+  ) {
     _assertActorTurn(actor);
     _assertCanAttack(actor, attacker);
     final defendingPlayer = _otherPlayerOf(actor);
@@ -184,6 +201,13 @@ class GameEngine {
       throw GameRuleViolation('That card is not a valid target.');
     }
 
+    // Count actual HP removed, including retaliation, without overkill.
+    if (actor == player) {
+      damageDealt += min(defender.currentHp, attacker.card.attack);
+    }
+    if (defendingPlayer == player) {
+      damageDealt += min(attacker.currentHp, defender.card.attack);
+    }
     defender.currentHp = max(0, defender.currentHp - attacker.card.attack);
     attacker.currentHp = max(0, attacker.currentHp - defender.card.attack);
     attacker.hasAttackedThisTurn = true;
@@ -204,6 +228,9 @@ class GameEngine {
     _assertCanAttack(actor, attacker);
 
     final defendingPlayer = _otherPlayerOf(actor);
+    if (actor == player) {
+      damageDealt += min(defendingPlayer.hp, attacker.card.attack);
+    }
     defendingPlayer.hp = max(0, defendingPlayer.hp - attacker.card.attack);
     attacker.hasAttackedThisTurn = true;
     _log(
@@ -218,10 +245,14 @@ class GameEngine {
 
   void _assertCanAttack(PlayerState actor, BattlefieldCard attacker) {
     if (!actor.battlefield.contains(attacker)) {
-      throw GameRuleViolation('That card is not on ${actor.name}\'s battlefield.');
+      throw GameRuleViolation(
+        'That card is not on ${actor.name}\'s battlefield.',
+      );
     }
     if (attacker.hasAttackedThisTurn) {
-      throw GameRuleViolation('${attacker.card.name} has already attacked this turn.');
+      throw GameRuleViolation(
+        '${attacker.card.name} has already attacked this turn.',
+      );
     }
   }
 
@@ -247,7 +278,7 @@ class GameEngine {
     if (isPlayerTurn) turnNumber++;
     _beginTurn();
 
-    if (!isPlayerTurn && !isGameOver) {
+    if (!isPlayerTurn && !isGameOver && autoRunOpponent) {
       _runOpponentTurn();
     }
   }
@@ -257,30 +288,42 @@ class GameEngine {
   /// enough to demonstrate a full two-player match without building
   /// real multiplayer or AI.
   void _runOpponentTurn() {
-    var playedSomething = true;
-    while (playedSomething && !isGameOver) {
-      playedSomething = false;
-      for (final card in List<GameCard>.from(opponent.hand)) {
-        if (opponent.resource >= card.attackCost &&
-            opponent.battlefield.length < maxBattlefieldSize) {
-          playCard(opponent, card);
-          playedSomething = true;
-          break;
-        }
-      }
-    }
-
-    for (final attacker in List<BattlefieldCard>.from(opponent.battlefield)) {
-      if (isGameOver) break;
-      if (!attacker.hasAttackedThisTurn) {
-        attackPlayer(opponent, attacker);
-      }
-    }
-
-    if (!isGameOver) {
-      endTurn();
+    while (!isPlayerTurn && !isGameOver) {
+      nextOpponentAction()?.apply();
     }
   }
 
+  /// Preview one action before applying it. Request the next only after apply.
+  OpponentAction? nextOpponentAction() {
+    if (isPlayerTurn || isGameOver) return null;
+    if (opponent.battlefield.length < maxBattlefieldSize) {
+      for (final card in opponent.hand) {
+        if (opponent.resource >= card.attackCost) {
+          return OpponentAction(
+            'Opponent plays ${card.name}',
+            () => playCard(opponent, card),
+          );
+        }
+      }
+    }
+    for (final card in opponent.battlefield) {
+      if (!card.hasAttackedThisTurn) {
+        return OpponentAction(
+          '${card.card.name} attacks you',
+          () => attackPlayer(opponent, card),
+          attacker: card,
+        );
+      }
+    }
+    return OpponentAction('Opponent ends their turn', endTurn);
+  }
+
   void _log(String message) => log.add(message);
+}
+
+class OpponentAction {
+  const OpponentAction(this.message, this.apply, {this.attacker});
+  final String message;
+  final void Function() apply;
+  final BattlefieldCard? attacker;
 }

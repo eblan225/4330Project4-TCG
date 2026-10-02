@@ -97,4 +97,20 @@ void main() {
     await tester.pumpWidget(const SizedBox.shrink());
     expect(player.calls.last, 'dispose');
   });
+
+  testWidgets('blocked browser autoplay retries on the first tap', (
+    tester,
+  ) async {
+    final player = FakeMusicPlayer()..failNextPlay = true;
+    await tester.pumpWidget(AnimalTcgApp(musicPlayer: player));
+    await tester.pump();
+
+    expect(player.calls, ['mode:ReleaseMode.loop', 'play']);
+    await tester.tap(find.text('Settings'));
+    await tester.pumpAndSettle();
+
+    expect(player.calls, ['mode:ReleaseMode.loop', 'play', 'play']);
+    expect(player.playedSource, isA<AssetSource>());
+    await tester.pumpWidget(const SizedBox.shrink());
+  });
 }

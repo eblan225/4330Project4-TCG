@@ -24,6 +24,9 @@ class AnimalTcgApp extends StatefulWidget {
 class _AnimalTcgAppState extends State<AnimalTcgApp> {
   late final AudioPlayer _musicPlayer;
   bool _musicEnabled = true;
+  bool _musicStarted = false;
+  bool _startingMusic = false;
+  bool _releaseModeConfigured = false;
 
   @override
   void initState() {
@@ -34,17 +37,30 @@ class _AnimalTcgAppState extends State<AnimalTcgApp> {
   }
 
   Future<void> _startMusic() async {
+    if (_startingMusic || _musicStarted || !_musicEnabled) return;
+    _startingMusic = true;
     try {
-      await _musicPlayer.setReleaseMode(ReleaseMode.loop);
-      if (!mounted) return;
+      if (!_releaseModeConfigured) {
+        await _musicPlayer.setReleaseMode(ReleaseMode.loop);
+        _releaseModeConfigured = true;
+      }
+      if (!mounted || !_musicEnabled) return;
       // AssetSource adds the assets/ prefix automatically.
       await _musicPlayer.play(
         AssetSource('audio/Sunny Day and Yarn Ball.f251.mp3'),
       );
+      _musicStarted = true;
     } catch (error) {
-      // An audio device or asset failure should not prevent playing the game.
+      // Browsers commonly reject autoplay until the first pointer interaction.
+      // The Listener in build retries then; other audio failures stay harmless.
       debugPrint('Unable to start background music: $error');
+    } finally {
+      _startingMusic = false;
     }
+  }
+
+  void _retryMusicAfterInteraction() {
+    if (_musicEnabled && !_musicStarted) unawaited(_startMusic());
   }
 
   Future<void> _disposeMusic() async {
@@ -59,7 +75,11 @@ class _AnimalTcgAppState extends State<AnimalTcgApp> {
   void _setMusicEnabled(bool enabled) {
     if (_musicEnabled == enabled) return;
     setState(() => _musicEnabled = enabled);
-    unawaited(_updateMusicVolume(enabled));
+    if (enabled && !_musicStarted) {
+      unawaited(_startMusic());
+    } else {
+      unawaited(_updateMusicVolume(enabled));
+    }
   }
 
   Future<void> _updateMusicVolume(bool enabled) async {
@@ -82,11 +102,15 @@ class _AnimalTcgAppState extends State<AnimalTcgApp> {
     return MusicSettingsScope(
       musicEnabled: _musicEnabled,
       onMusicEnabledChanged: _setMusicEnabled,
-      child: MaterialApp(
-        title: 'Animal TCG',
-        debugShowCheckedModeBanner: false,
-        theme: AppTheme.theme,
-        home: const MainMenuScreen(),
+      child: Listener(
+        behavior: HitTestBehavior.translucent,
+        onPointerDown: (_) => _retryMusicAfterInteraction(),
+        child: MaterialApp(
+          title: 'Animal TCG',
+          debugShowCheckedModeBanner: false,
+          theme: AppTheme.theme,
+          home: const MainMenuScreen(),
+        ),
       ),
     );
   }

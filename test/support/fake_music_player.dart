@@ -6,6 +6,7 @@ class FakeMusicPlayer extends Fake implements AudioPlayer {
   final calls = <String>[];
   Source? playedSource;
   Future<void>? configuration;
+  bool failNextPlay = false;
 
   @override
   Future<void> setVolume(double volume) async {
@@ -28,6 +29,10 @@ class FakeMusicPlayer extends Fake implements AudioPlayer {
     PlayerMode? mode,
   }) async {
     calls.add('play');
+    if (failNextPlay) {
+      failNextPlay = false;
+      throw StateError('Autoplay blocked');
+    }
     playedSource = source;
   }
 

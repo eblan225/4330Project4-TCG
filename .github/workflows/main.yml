@@ -1,4 +1,4 @@
-name: Android CI / Build & Release APK
+name: Flutter automated tests and Android build
 
 on:
   push:
@@ -6,9 +6,10 @@ on:
     tags: ['v*.*.*']
   pull_request:
     branches: [main, master, upgrade]
+  workflow_dispatch:
 
 permissions:
-  contents: write
+  contents: read
   actions: read
 
 concurrency:
@@ -16,42 +17,94 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  build_and_release:
+  analyze:
+    name: Analyze Flutter and server code
     runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v6
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+      - name: Get Flutter dependencies
+        run: flutter pub get
+      - name: Analyze Flutter code
+        run: flutter analyze
+      - name: Install server dependencies
+        working-directory: server
+        run: npm ci
+      - name: Check server syntax
+        run: node --check server/server.js
+
+  test:
+    name: Test ${{ matrix.label }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - label: Background music
+            file: test/background_music_test.dart
+          - label: Battle feedback
+            file: test/battle_feedback_test.dart
+          - label: Card catalog
+            file: test/card_catalog_test.dart
+          - label: Collection screen
+            file: test/collection_screen_test.dart
+          - label: Deck builder screen
+            file: test/deck_builder_screen_test.dart
+          - label: Deck library
+            file: test/deck_library_test.dart
+          - label: Deck model
+            file: test/deck_test.dart
+          - label: Game board screen
+            file: test/game_board_screen_test.dart
+          - label: Game engine
+            file: test/game_engine_test.dart
+          - label: Player collection
+            file: test/player_collection_test.dart
+          - label: App navigation
+            file: test/widget_test.dart
 
     steps:
       - name: Checkout code
         uses: actions/checkout@v6
-
-      - name: Cache pub dependencies
-        uses: actions/cache@v5
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
         with:
-          path: ~/.pub-cache
-          key: ${{ runner.os }}-pub-${{ hashFiles('**/pubspec.yaml') }}
-          restore-keys: |
-            ${{ runner.os }}-pub-
+          channel: stable
+          cache: true
+      - name: Get dependencies
+        run: flutter pub get
+      - name: Run test group
+        run: flutter test ${{ matrix.file }}
 
+  build_android:
+    name: Build release APK
+    needs: [analyze, test]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v6
       - name: Setup Java
         uses: actions/setup-java@v5
         with:
           distribution: temurin
           java-version: '17'
-
       - name: Setup Flutter
         uses: subosito/flutter-action@v2
         with:
           channel: stable
-
+          cache: true
       - name: Get dependencies
         run: flutter pub get
-
-      - name: Run tests
-        run: flutter test --coverage
-
-      - name: Build APKs
+      - name: Build release APK
         run: flutter build apk --release
-
-      - name: Prepare artifacts
-        run: |
-          mkdir -p artifacts
-          cp build/app/outputs/flutter-apk/*.apk artifacts/
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: animal-tcg-release-apk
+          path: build/app/outputs/flutter-apk/app-release.apk
+          if-no-files-found: error

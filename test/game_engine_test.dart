@@ -57,6 +57,21 @@ void main() {
       expect(game.turnNumber, 1);
     });
 
+    test('the first player is randomly selected when not forced', () {
+      final results = <bool>{};
+      for (var seed = 0; seed < 30; seed++) {
+        final game = GameEngine(
+          playerDeck: _deckFrom(0),
+          opponentDeck: _deckFrom(10),
+          random: Random(seed),
+          forcePlayerFirst: null,
+          autoRunOpponent: false,
+        );
+        results.add(game.isPlayerTurn);
+      }
+      expect(results, containsAll(<bool>[true, false]));
+    });
+
     test(
       'decks are shuffled and distinct between runs with different seeds',
       () {

@@ -49,6 +49,32 @@ Future<void> _pumpBoard(WidgetTester tester, GameEngine engine) async {
 }
 
 void main() {
+  testWidgets('opening shows game start, coin flip, and first player', (
+    WidgetTester tester,
+  ) async {
+    await tester.pumpWidget(
+      MaterialApp(home: GameBoardScreen(gameEngine: _engine())),
+    );
+    await tester.pump();
+    expect(find.byKey(const ValueKey('opening-game-start')), findsOneWidget);
+    expect(find.text('GAME START'), findsOneWidget);
+
+    await tester.pump(const Duration(milliseconds: 1400));
+    await tester.pump();
+    expect(find.byKey(const ValueKey('opening-coin-flip')), findsOneWidget);
+    expect(find.text('FLIPPING FOR FIRST TURN…'), findsOneWidget);
+
+    await tester.pump(const Duration(milliseconds: 1900));
+    await tester.pump();
+    expect(find.byKey(const ValueKey('opening-result')), findsOneWidget);
+    expect(find.text('YOU GO FIRST!'), findsOneWidget);
+
+    await tester.pump(const Duration(milliseconds: 1500));
+    await tester.pump();
+    expect(find.byKey(const ValueKey('opening-result')), findsNothing);
+    await tester.pumpAndSettle();
+  });
+
   testWidgets('game board does not overflow in a compact window', (
     WidgetTester tester,
   ) async {

@@ -12,6 +12,8 @@ import '../widgets/section_panel.dart';
 import '../widgets/trading_card.dart';
 import 'game_outcome_screen.dart';
 
+enum _OpeningPhase { hidden, gameStart, coinFlip, result }
+
 /// Plays a full two-player match using [GameEngine]. There's no
 /// multiplayer yet, so the opponent is driven by the engine's simple
 /// built-in automatic logic — the player only ever controls their
@@ -39,15 +41,19 @@ class _GameBoardScreenState extends State<GameBoardScreen>
   late final GameEngine _engine = widget.gameEngine ?? _buildEngine();
   late final AnimationController _turnController = AnimationController(
     vsync: this,
-    duration: const Duration(milliseconds: 1500),
+    duration: const Duration(milliseconds: 2400),
   );
   late final AnimationController _attackController = AnimationController(
     vsync: this,
-    duration: const Duration(milliseconds: 720),
+    duration: const Duration(milliseconds: 1152),
   );
   late final AnimationController _summonController = AnimationController(
     vsync: this,
-    duration: const Duration(milliseconds: 420),
+    duration: const Duration(milliseconds: 672),
+  );
+  late final AnimationController _openingController = AnimationController(
+    vsync: this,
+    duration: const Duration(milliseconds: 4600),
   );
 
   BattlefieldCard? _attackingCard;
@@ -58,6 +64,7 @@ class _GameBoardScreenState extends State<GameBoardScreen>
   bool _isBusy = false;
   BattlefieldCard? _enteringCard;
   bool _navigatingToOutcome = false;
+  bool _showOpening = false;
 
   @override
   void initState() {
@@ -70,6 +77,7 @@ class _GameBoardScreenState extends State<GameBoardScreen>
     _turnController.dispose();
     _attackController.dispose();
     _summonController.dispose();
+    _openingController.dispose();
     super.dispose();
   }
 
@@ -89,6 +97,8 @@ class _GameBoardScreenState extends State<GameBoardScreen>
 
   Future<void> _startBoard() async {
     _isBusy = true;
+    await _showOpeningSequence();
+    if (!mounted) return;
     await _showTurnAnnouncement();
     if (!_engine.isPlayerTurn && !_engine.isGameOver) {
       await _resolveOpponentTurn();
@@ -96,6 +106,13 @@ class _GameBoardScreenState extends State<GameBoardScreen>
       _isBusy = false;
       if (mounted) setState(() {});
     }
+  }
+
+  Future<void> _showOpeningSequence() async {
+    setState(() => _showOpening = true);
+    await _openingController.forward(from: 0);
+    if (!mounted) return;
+    setState(() => _showOpening = false);
   }
 
   void _afterAction() {
@@ -424,6 +441,15 @@ class _GameBoardScreenState extends State<GameBoardScreen>
                       animation: _turnController,
                       turnNumber: _engine.turnNumber,
                       isPlayerTurn: _engine.isPlayerTurn,
+                    ),
+                  ),
+                  Positioned.fill(
+                    child: IgnorePointer(
+                      child: _OpeningAnnouncement(
+                        visible: _showOpening,
+                        animation: _openingController,
+                        playerGoesFirst: _engine.isPlayerTurn,
+                      ),
                     ),
                   ),
                 ],
@@ -1016,6 +1042,186 @@ class _DamageNumber extends StatelessWidget {
         shadows: [
           Shadow(color: Colors.white, blurRadius: 5),
           Shadow(color: Colors.black54, blurRadius: 8),
+        ],
+      ),
+    );
+  }
+}
+
+/// Introduces the match before normal turn banners begin. The engine has
+/// already chosen the first player randomly; this overlay makes that choice
+/// visible instead of dropping the player directly into a turn.
+class _OpeningAnnouncement extends StatelessWidget {
+  const _OpeningAnnouncement({
+    required this.visible,
+    required this.animation,
+    required this.playerGoesFirst,
+  });
+
+  final bool visible;
+  final Animation<double> animation;
+  final bool playerGoesFirst;
+
+  @override
+  Widget build(BuildContext context) {
+    if (!visible) return const SizedBox.shrink();
+
+    return AnimatedBuilder(
+      animation: animation,
+      builder: (context, _) {
+        const gameStartEnd = 1400 / 4600;
+        const coinFlipEnd = 3200 / 4600;
+        final value = animation.value.clamp(0.0, 1.0);
+        final phase = value < gameStartEnd
+            ? _OpeningPhase.gameStart
+            : value < coinFlipEnd
+            ? _OpeningPhase.coinFlip
+            : _OpeningPhase.result;
+        final coinProgress =
+            ((value - gameStartEnd) / (coinFlipEnd - gameStartEnd)).clamp(
+              0.0,
+              1.0,
+            );
+
+        return ColoredBox(
+          color: Colors.black.withValues(alpha: 0.68),
+          child: Center(
+            child: AnimatedSwitcher(
+              duration: const Duration(milliseconds: 350),
+              child: switch (phase) {
+                _OpeningPhase.gameStart => _OpeningCard(
+                  key: const ValueKey('opening-game-start'),
+                  icon: Icons.sports_esports,
+                  title: 'GAME START',
+                  subtitle: 'Preparing the battlefield…',
+                ),
+                _OpeningPhase.coinFlip => _FlippingCoin(
+                  key: const ValueKey('opening-coin-flip'),
+                  progress: coinProgress,
+                ),
+                _OpeningPhase.result => _OpeningCard(
+                  key: const ValueKey('opening-result'),
+                  icon: playerGoesFirst ? Icons.person : Icons.smart_toy,
+                  title: playerGoesFirst
+                      ? 'YOU GO FIRST!'
+                      : 'OPPONENT GOES FIRST!',
+                  subtitle: 'The coin has decided',
+                ),
+                _OpeningPhase.hidden => const SizedBox.shrink(),
+              },
+            ),
+          ),
+        );
+      },
+    );
+  }
+}
+
+class _FlippingCoin extends StatelessWidget {
+  const _FlippingCoin({super.key, required this.progress});
+
+  final double progress;
+
+  @override
+  Widget build(BuildContext context) {
+    final lift = sin(progress * pi) * 70;
+    return Transform.translate(
+      offset: Offset(0, -lift),
+      child: Transform(
+        alignment: Alignment.center,
+        transform: Matrix4.identity()
+          ..setEntry(3, 2, 0.001)
+          ..rotateY(progress * pi * 10),
+        child: const _CoinFace(),
+      ),
+    );
+  }
+}
+
+class _CoinFace extends StatelessWidget {
+  const _CoinFace();
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Container(
+          width: 118,
+          height: 118,
+          decoration: BoxDecoration(
+            shape: BoxShape.circle,
+            gradient: const RadialGradient(
+              colors: [Color(0xFFFFF3A6), AppColors.goldAccent],
+            ),
+            border: Border.all(color: Colors.white, width: 4),
+            boxShadow: const [
+              BoxShadow(color: Colors.black54, blurRadius: 22, spreadRadius: 3),
+            ],
+          ),
+          child: const Icon(
+            Icons.pets,
+            size: 58,
+            color: AppColors.darkForestGreen,
+          ),
+        ),
+        const SizedBox(height: 24),
+        const Text(
+          'FLIPPING FOR FIRST TURN…',
+          style: TextStyle(
+            color: Colors.white,
+            fontSize: 19,
+            fontWeight: FontWeight.w800,
+            letterSpacing: 1.2,
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _OpeningCard extends StatelessWidget {
+  const _OpeningCard({
+    super.key,
+    required this.icon,
+    required this.title,
+    required this.subtitle,
+  });
+
+  final IconData icon;
+  final String title;
+  final String subtitle;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      constraints: const BoxConstraints(maxWidth: 430),
+      padding: const EdgeInsets.symmetric(horizontal: 42, vertical: 30),
+      decoration: BoxDecoration(
+        gradient: const LinearGradient(
+          colors: [AppColors.darkForestGreen, AppColors.forestGreen],
+        ),
+        borderRadius: BorderRadius.circular(22),
+        border: Border.all(color: AppColors.goldAccent, width: 3),
+        boxShadow: const [BoxShadow(color: Colors.black54, blurRadius: 28)],
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, color: AppColors.goldAccent, size: 54),
+          const SizedBox(height: 12),
+          Text(
+            title,
+            textAlign: TextAlign.center,
+            style: const TextStyle(
+              color: Colors.white,
+              fontSize: 28,
+              fontWeight: FontWeight.w900,
+              letterSpacing: 1.5,
+            ),
+          ),
+          const SizedBox(height: 6),
+          Text(subtitle, style: const TextStyle(color: Colors.white70)),
         ],
       ),
     );

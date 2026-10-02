@@ -69,9 +69,9 @@ void main() {
           .onPressed,
       isNull,
     );
-    await tester.pump(const Duration(milliseconds: 1600));
+    await tester.pump(const Duration(milliseconds: 2500));
     expect(find.byKey(const ValueKey('damage-indicator')), findsOneWidget);
-    await tester.pump(const Duration(milliseconds: 800));
+    await tester.pump(const Duration(milliseconds: 1300));
     expect(game.player.hp, 1000 - attacker.card.attack);
     // Disposing during presentation cancels the remaining timer.
     await tester.pumpWidget(const SizedBox());

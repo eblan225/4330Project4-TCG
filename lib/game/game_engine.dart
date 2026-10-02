@@ -83,7 +83,9 @@ class GameEngine {
     required Deck opponentDeck,
     Random? random,
     bool? forcePlayerFirst,
-  }) : _random = random ?? Random(),
+    this.autoRunOpponent = true,
+  }) : startingDeck = playerDeck.copy(),
+       _random = random ?? Random(),
        player = PlayerState(name: 'Player', deckCards: _expand(playerDeck)),
        opponent = PlayerState(
          name: 'Opponent',
@@ -97,6 +99,11 @@ class GameEngine {
   static const int maxResourceCap = 10;
   static const int maxBattlefieldSize = 5;
 
+  final Deck startingDeck;
+  bool autoRunOpponent;
+  int playerTurns = 0;
+  int cardsPlayed = 0;
+  int damageDealt = 0;
   final Random _random;
   final PlayerState player;
   final PlayerState opponent;
@@ -158,13 +165,14 @@ class GameEngine {
     _log('${currentPlayer.name} goes first.');
     _beginTurn();
 
-    if (!isPlayerTurn) {
+    if (!isPlayerTurn && autoRunOpponent) {
       _runOpponentTurn();
     }
   }
 
   void _beginTurn() {
     final actor = currentPlayer;
+    if (actor == player) playerTurns++;
     for (final battlefieldCard in actor.battlefield) {
       battlefieldCard.hasAttackedThisTurn = false;
     }
@@ -202,6 +210,7 @@ class GameEngine {
       throw GameRuleViolation("${actor.name}'s battlefield is full.");
     }
 
+    if (actor == player) cardsPlayed++;
     actor.hand.remove(card);
     actor.resource -= card.attackCost;
     actor.battlefield.add(BattlefieldCard(card));
@@ -223,6 +232,9 @@ class GameEngine {
       throw GameRuleViolation('That card is not a valid target.');
     }
 
+    if (actor == player) {
+      damageDealt += min(defender.currentHp, attacker.card.attack);
+    }
     defender.currentHp = max(0, defender.currentHp - attacker.card.attack);
     attacker.currentHp = max(0, attacker.currentHp - defender.card.attack);
     attacker.hasAttackedThisTurn = true;
@@ -243,6 +255,9 @@ class GameEngine {
     _assertCanAttack(actor, attacker);
 
     final defendingPlayer = _otherPlayerOf(actor);
+    if (actor == player) {
+      damageDealt += min(defendingPlayer.hp, attacker.card.attack);
+    }
     defendingPlayer.hp = max(0, defendingPlayer.hp - attacker.card.attack);
     attacker.hasAttackedThisTurn = true;
     _log(
@@ -286,8 +301,10 @@ class GameEngine {
     if (isGameOver) return;
 
     beginOpponentTurn();
-    while (!isPlayerTurn && !isGameOver) {
-      performNextOpponentAction();
+    if (autoRunOpponent) {
+      while (!isPlayerTurn && !isGameOver) {
+        performNextOpponentAction();
+      }
     }
   }
 

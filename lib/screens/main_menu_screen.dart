@@ -3,7 +3,8 @@ import 'package:flutter/material.dart';
 import '../theme/app_theme.dart';
 import 'collection_screen.dart';
 import 'deck_builder_screen.dart';
-import 'game_lobby_screen.dart';
+import 'match_setup_screen.dart';
+import 'profile_creator_screen.dart';
 import 'settings_screen.dart';
 
 /// The first screen the player sees. Gives access to every other
@@ -24,24 +25,26 @@ class MainMenuScreen extends StatelessWidget {
         ),
         child: SafeArea(
           child: Center(
-            child: Padding(
+            child: SingleChildScrollView(
               padding: const EdgeInsets.all(24),
               child: Column(
+                mainAxisSize: MainAxisSize.min,
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
                   const Icon(Icons.pets, size: 96, color: AppColors.goldAccent),
                   const SizedBox(height: 16),
                   Text(
                     'ANIMAL TCG',
-                    style: Theme.of(context)
-                        .textTheme
-                        .headlineLarge
+                    style: Theme.of(context).textTheme.headlineLarge
                         ?.copyWith(color: Colors.white),
                   ),
                   const SizedBox(height: 4),
                   const Text(
                     'A wild trading card game',
-                    style: TextStyle(color: Colors.white70, fontStyle: FontStyle.italic),
+                    style: TextStyle(
+                      color: Colors.white70,
+                      fontStyle: FontStyle.italic,
+                    ),
                   ),
                   const SizedBox(height: 48),
                   _MenuButton(
@@ -49,7 +52,9 @@ class MainMenuScreen extends StatelessWidget {
                     icon: Icons.play_arrow,
                     onPressed: () => Navigator.push(
                       context,
-                      MaterialPageRoute(builder: (_) => const GameLobbyScreen()),
+                      MaterialPageRoute(
+                        builder: (_) => const MatchSetupScreen(),
+                      ),
                     ),
                   ),
                   const SizedBox(height: 16),
@@ -58,7 +63,9 @@ class MainMenuScreen extends StatelessWidget {
                     icon: Icons.collections_bookmark,
                     onPressed: () => Navigator.push(
                       context,
-                      MaterialPageRoute(builder: (_) => const CollectionScreen()),
+                      MaterialPageRoute(
+                        builder: (_) => const CollectionScreen(),
+                      ),
                     ),
                   ),
                   const SizedBox(height: 16),
@@ -67,7 +74,20 @@ class MainMenuScreen extends StatelessWidget {
                     icon: Icons.style,
                     onPressed: () => Navigator.push(
                       context,
-                      MaterialPageRoute(builder: (_) => const DeckBuilderScreen()),
+                      MaterialPageRoute(
+                        builder: (_) => const DeckBuilderScreen(),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  _MenuButton(
+                    label: 'Profile',
+                    icon: Icons.account_circle,
+                    onPressed: () => Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => const ProfileCreatorScreen(),
+                      ),
                     ),
                   ),
                   const SizedBox(height: 16),

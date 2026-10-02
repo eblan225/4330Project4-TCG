@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../models/deck.dart';
 import '../theme/app_theme.dart';
 import 'game_results_screen.dart';
 
@@ -9,10 +10,16 @@ class GameOutcomeScreen extends StatefulWidget {
     super.key,
     required this.didWin,
     required this.turnsPlayed,
+    required this.cardsPlayed,
+    required this.damageDealt,
+    required this.deck,
   });
 
   final bool didWin;
   final int turnsPlayed;
+  final int cardsPlayed;
+  final int damageDealt;
+  final Deck deck;
 
   @override
   State<GameOutcomeScreen> createState() => _GameOutcomeScreenState();
@@ -87,6 +94,9 @@ class _GameOutcomeScreenState extends State<GameOutcomeScreen>
                         builder: (_) => GameResultsScreen(
                           didWin: widget.didWin,
                           turnsPlayed: widget.turnsPlayed,
+                          cardsPlayed: widget.cardsPlayed,
+                          damageDealt: widget.damageDealt,
+                          deck: widget.deck,
                         ),
                       ),
                     ),

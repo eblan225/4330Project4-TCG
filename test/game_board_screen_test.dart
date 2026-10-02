@@ -38,6 +38,10 @@ GameEngine _engine({int opponentHp = 10000}) {
 }
 
 Future<void> _pumpBoard(WidgetTester tester, GameEngine engine) async {
+  tester.view.physicalSize = const Size(1200, 900);
+  tester.view.devicePixelRatio = 1;
+  addTearDown(tester.view.resetPhysicalSize);
+  addTearDown(tester.view.resetDevicePixelRatio);
   await tester.pumpWidget(
     MaterialApp(home: GameBoardScreen(gameEngine: engine)),
   );
@@ -45,6 +49,23 @@ Future<void> _pumpBoard(WidgetTester tester, GameEngine engine) async {
 }
 
 void main() {
+  testWidgets('game board does not overflow in a compact window', (
+    WidgetTester tester,
+  ) async {
+    tester.view.physicalSize = const Size(800, 600);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    await tester.pumpWidget(
+      MaterialApp(home: GameBoardScreen(gameEngine: _engine())),
+    );
+    await tester.pumpAndSettle();
+
+    expect(tester.takeException(), isNull);
+    expect(find.text('Game Board'), findsOneWidget);
+  });
+
   testWidgets('shows real HP and resource from the engine', (
     WidgetTester tester,
   ) async {

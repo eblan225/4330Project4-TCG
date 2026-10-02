@@ -14,7 +14,9 @@ import '../widgets/trading_card.dart';
 /// finished decks into `deckLibrary` — it never keeps its own copy of
 /// card or ownership data, only the deck-in-progress itself.
 class DeckBuilderScreen extends StatefulWidget {
-  const DeckBuilderScreen({super.key});
+  const DeckBuilderScreen({super.key, this.initialDeck});
+
+  final Deck? initialDeck;
 
   @override
   State<DeckBuilderScreen> createState() => _DeckBuilderScreenState();
@@ -25,7 +27,14 @@ class _DeckBuilderScreenState extends State<DeckBuilderScreen> {
   final _searchController = TextEditingController();
 
   CardRarity? _rarityFilter;
-  final Deck _deck = Deck(name: '');
+  late final Deck _deck;
+
+  @override
+  void initState() {
+    super.initState();
+    _deck = widget.initialDeck?.copy() ?? Deck(name: '');
+    _nameController.text = _deck.name;
+  }
 
   @override
   void dispose() {
@@ -121,7 +130,10 @@ class _DeckBuilderScreenState extends State<DeckBuilderScreen> {
                         children: [
                           const Text(
                             'Tap a card to add a copy to your deck.',
-                            style: TextStyle(color: Colors.black54, fontSize: 12),
+                            style: TextStyle(
+                              color: Colors.black54,
+                              fontSize: 12,
+                            ),
                           ),
                           const SizedBox(height: 8),
                           Expanded(
@@ -135,11 +147,11 @@ class _DeckBuilderScreenState extends State<DeckBuilderScreen> {
                                     itemCount: availableCards.length,
                                     gridDelegate:
                                         const SliverGridDelegateWithMaxCrossAxisExtent(
-                                      maxCrossAxisExtent: 120,
-                                      mainAxisSpacing: 16,
-                                      crossAxisSpacing: 12,
-                                      childAspectRatio: 1 / 1.4,
-                                    ),
+                                          maxCrossAxisExtent: 120,
+                                          mainAxisSpacing: 16,
+                                          crossAxisSpacing: 12,
+                                          childAspectRatio: 1 / 1.4,
+                                        ),
                                     itemBuilder: (context, index) {
                                       final card = availableCards[index];
                                       return Center(
@@ -148,8 +160,9 @@ class _DeckBuilderScreenState extends State<DeckBuilderScreen> {
                                           card: card,
                                           countInDeck: _deck.copiesOf(card.id),
                                           canAdd: _deck.canAdd(card.id),
-                                          onTap: () =>
-                                              setState(() => _deck.addCopy(card.id)),
+                                          onTap: () => setState(
+                                            () => _deck.addCopy(card.id),
+                                          ),
                                         ),
                                       );
                                     },
@@ -175,26 +188,34 @@ class _DeckBuilderScreenState extends State<DeckBuilderScreen> {
                           Text(
                             '${_deck.uniqueCardCount} unique  •  '
                             '${_deck.duplicateCardCount} duplicate',
-                            style: const TextStyle(color: Colors.black54, fontSize: 12),
+                            style: const TextStyle(
+                              color: Colors.black54,
+                              fontSize: 12,
+                            ),
                           ),
                           const SizedBox(height: 4),
                           const Text(
                             'Tap a card to remove a copy.',
-                            style: TextStyle(color: Colors.black54, fontSize: 12),
+                            style: TextStyle(
+                              color: Colors.black54,
+                              fontSize: 12,
+                            ),
                           ),
                           const SizedBox(height: 8),
                           Expanded(
                             child: deckCards.isEmpty
-                                ? const Center(child: Text('No cards in your deck yet.'))
+                                ? const Center(
+                                    child: Text('No cards in your deck yet.'),
+                                  )
                                 : GridView.builder(
                                     itemCount: deckCards.length,
                                     gridDelegate:
                                         const SliverGridDelegateWithMaxCrossAxisExtent(
-                                      maxCrossAxisExtent: 110,
-                                      mainAxisSpacing: 16,
-                                      crossAxisSpacing: 10,
-                                      childAspectRatio: 1 / 1.4,
-                                    ),
+                                          maxCrossAxisExtent: 110,
+                                          mainAxisSpacing: 16,
+                                          crossAxisSpacing: 10,
+                                          childAspectRatio: 1 / 1.4,
+                                        ),
                                     itemBuilder: (context, index) {
                                       final card = deckCards[index];
                                       return Center(
@@ -202,8 +223,9 @@ class _DeckBuilderScreenState extends State<DeckBuilderScreen> {
                                           key: ValueKey('deck-${card.id}'),
                                           card: card,
                                           count: _deck.copiesOf(card.id),
-                                          onTap: () =>
-                                              setState(() => _deck.removeCopy(card.id)),
+                                          onTap: () => setState(
+                                            () => _deck.removeCopy(card.id),
+                                          ),
                                         ),
                                       );
                                     },
@@ -221,7 +243,9 @@ class _DeckBuilderScreenState extends State<DeckBuilderScreen> {
               children: [
                 Icon(
                   _deck.isValid ? Icons.check_circle : Icons.error_outline,
-                  color: _deck.isValid ? AppColors.forestGreen : Colors.redAccent,
+                  color: _deck.isValid
+                      ? AppColors.forestGreen
+                      : Colors.redAccent,
                   size: 20,
                 ),
                 const SizedBox(width: 8),
@@ -230,7 +254,7 @@ class _DeckBuilderScreenState extends State<DeckBuilderScreen> {
                     _deck.isValid
                         ? 'Deck is ready to play.'
                         : 'A deck needs exactly ${Deck.deckSize} cards, with no more '
-                            'than ${Deck.maxCopiesPerCard} copies of any one card.',
+                              'than ${Deck.maxCopiesPerCard} copies of any one card.',
                     style: const TextStyle(color: Colors.black54),
                   ),
                 ),
@@ -252,8 +276,10 @@ class _DeckBuilderScreenState extends State<DeckBuilderScreen> {
 
     return cardCatalog.where((card) {
       if (!playerCollection.owns(card.id)) return false;
-      final matchesRarity = _rarityFilter == null || card.rarity == _rarityFilter;
-      final matchesSearch = query.isEmpty ||
+      final matchesRarity =
+          _rarityFilter == null || card.rarity == _rarityFilter;
+      final matchesSearch =
+          query.isEmpty ||
           card.name.toLowerCase().contains(query) ||
           card.animal.toLowerCase().contains(query);
       return matchesRarity && matchesSearch;
@@ -278,10 +304,12 @@ class _DeckBuilderScreenState extends State<DeckBuilderScreen> {
       final remaining = Deck.deckSize - _deck.totalCards;
       final String message;
       if (remaining > 0) {
-        message = 'Deck needs $remaining more card${remaining == 1 ? '' : 's'} '
+        message =
+            'Deck needs $remaining more card${remaining == 1 ? '' : 's'} '
             '(${_deck.totalCards}/${Deck.deckSize}).';
       } else if (remaining < 0) {
-        message = 'Deck has too many cards (${_deck.totalCards}/${Deck.deckSize}).';
+        message =
+            'Deck has too many cards (${_deck.totalCards}/${Deck.deckSize}).';
       } else {
         message = 'A card exceeds the ${Deck.maxCopiesPerCard}-copy limit.';
       }
@@ -290,8 +318,13 @@ class _DeckBuilderScreenState extends State<DeckBuilderScreen> {
     }
 
     _deck.name = name;
-    deckLibrary.saveDeck(_deck.copy());
-    _showMessage("Deck '$name' saved!");
+    final savedDeck = _deck.copy();
+    deckLibrary.saveDeck(savedDeck);
+    if (Navigator.canPop(context)) {
+      Navigator.pop(context, savedDeck);
+    } else {
+      _showMessage("Deck '$name' saved!");
+    }
   }
 
   void _showMessage(String message) {
@@ -350,7 +383,11 @@ class _AvailableCardTile extends StatelessWidget {
           children: [
             TradingCardView(data: card, width: 100),
             if (countInDeck > 0)
-              Positioned(top: -6, right: -6, child: _CountBadge(count: countInDeck)),
+              Positioned(
+                top: -6,
+                right: -6,
+                child: _CountBadge(count: countInDeck),
+              ),
           ],
         ),
       ),

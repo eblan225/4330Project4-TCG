@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../models/card.dart';
+import 'battle_feedback.dart';
 import '../theme/app_theme.dart';
 
 /// Visual representation of a single trading card. Used in the
@@ -53,7 +54,11 @@ class TradingCardView extends StatelessWidget {
     final cardWidget = _buildFaceUpCard(card, width, height);
 
     if (!owned) {
-      return _UnownedCardOverlay(width: width, height: height, child: cardWidget);
+      return _UnownedCardOverlay(
+        width: width,
+        height: height,
+        child: cardWidget,
+      );
     }
     return cardWidget;
   }
@@ -117,12 +122,7 @@ class TradingCardView extends StatelessWidget {
               child: Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  _StatBadge(
-                    icon: Icons.favorite,
-                    value: hpOverride ?? card.hp,
-                    color: Colors.redAccent,
-                    fontSize: width * 0.1,
-                  ),
+                  AnimatedHp(hp: hpOverride ?? card.hp),
                   const SizedBox(width: 8),
                   _StatBadge(
                     icon: Icons.bolt,
@@ -169,10 +169,26 @@ class _UnownedCardOverlay extends StatelessWidget {
 
   // Standard luminance-based grayscale matrix.
   static const List<double> _grayscaleMatrix = [
-    0.2126, 0.7152, 0.0722, 0, 0,
-    0.2126, 0.7152, 0.0722, 0, 0,
-    0.2126, 0.7152, 0.0722, 0, 0,
-    0, 0, 0, 1, 0,
+    0.2126,
+    0.7152,
+    0.0722,
+    0,
+    0,
+    0.2126,
+    0.7152,
+    0.0722,
+    0,
+    0,
+    0.2126,
+    0.7152,
+    0.0722,
+    0,
+    0,
+    0,
+    0,
+    0,
+    1,
+    0,
   ];
 
   @override

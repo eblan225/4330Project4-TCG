@@ -13,7 +13,7 @@ import 'card_catalog.dart';
 /// change.
 class PlayerCollection {
   PlayerCollection({Set<String>? startingCardIds})
-      : _ownedCardIds = startingCardIds ?? _defaultStarterCardIds();
+    : _ownedCardIds = startingCardIds ?? _defaultStarterCardIds();
 
   final Set<String> _ownedCardIds;
 
@@ -38,7 +38,8 @@ class PlayerCollection {
     return cardCatalog
         .where(
           (card) =>
-              card.rarity == CardRarity.common || card.rarity == CardRarity.uncommon,
+              card.rarity == CardRarity.common ||
+              card.rarity == CardRarity.uncommon,
         )
         .map((card) => card.id)
         .toSet();

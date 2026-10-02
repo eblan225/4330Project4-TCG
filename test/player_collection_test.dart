@@ -10,11 +10,13 @@ void main() {
 
     for (final card in cardCatalog) {
       final shouldOwn =
-          card.rarity == CardRarity.common || card.rarity == CardRarity.uncommon;
+          card.rarity == CardRarity.common ||
+          card.rarity == CardRarity.uncommon;
       expect(
         collection.owns(card.id),
         shouldOwn,
-        reason: '${card.name} (${card.rarity.label}) ownership should be $shouldOwn',
+        reason:
+            '${card.name} (${card.rarity.label}) ownership should be $shouldOwn',
       );
     }
   });

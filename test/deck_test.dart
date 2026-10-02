@@ -67,15 +67,18 @@ void main() {
     expect(deck.totalCards, 0);
   });
 
-  test('a deck with exactly 30 cards and no card over the copy limit is valid', () {
-    final deck = Deck(name: 'Valid');
-    for (var i = 0; i < 10; i++) {
-      deck.cardCounts['card$i'] = 3;
-    }
+  test(
+    'a deck with exactly 30 cards and no card over the copy limit is valid',
+    () {
+      final deck = Deck(name: 'Valid');
+      for (var i = 0; i < 10; i++) {
+        deck.cardCounts['card$i'] = 3;
+      }
 
-    expect(deck.totalCards, 30);
-    expect(deck.isValid, isTrue);
-  });
+      expect(deck.totalCards, 30);
+      expect(deck.isValid, isTrue);
+    },
+  );
 
   test('clear empties the deck', () {
     final deck = Deck(name: 'Test', cardCounts: {'lion': 3, 'tiger': 2});

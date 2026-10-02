@@ -35,12 +35,15 @@ void main() {
       expect(game.opponent.hp, GameEngine.startingHp);
     });
 
-    test('the player who goes first has already drawn their turn-start card', () {
-      final game = _newGame(forcePlayerFirst: true);
-      // 5-card opening hand + 1 turn-start draw.
-      expect(game.player.hand.length, GameEngine.startingHandSize + 1);
-      expect(game.opponent.hand.length, GameEngine.startingHandSize);
-    });
+    test(
+      'the player who goes first has already drawn their turn-start card',
+      () {
+        final game = _newGame(forcePlayerFirst: true);
+        // 5-card opening hand + 1 turn-start draw.
+        expect(game.player.hand.length, GameEngine.startingHandSize + 1);
+        expect(game.opponent.hand.length, GameEngine.startingHandSize);
+      },
+    );
 
     test('the game is not over at the start', () {
       final game = _newGame();
@@ -54,24 +57,27 @@ void main() {
       expect(game.turnNumber, 1);
     });
 
-    test('decks are shuffled and distinct between runs with different seeds', () {
-      final gameA = GameEngine(
-        playerDeck: _deckFrom(0),
-        opponentDeck: _deckFrom(10),
-        random: Random(1),
-        forcePlayerFirst: true,
-      );
-      final gameB = GameEngine(
-        playerDeck: _deckFrom(0),
-        opponentDeck: _deckFrom(10),
-        random: Random(2),
-        forcePlayerFirst: true,
-      );
+    test(
+      'decks are shuffled and distinct between runs with different seeds',
+      () {
+        final gameA = GameEngine(
+          playerDeck: _deckFrom(0),
+          opponentDeck: _deckFrom(10),
+          random: Random(1),
+          forcePlayerFirst: true,
+        );
+        final gameB = GameEngine(
+          playerDeck: _deckFrom(0),
+          opponentDeck: _deckFrom(10),
+          random: Random(2),
+          forcePlayerFirst: true,
+        );
 
-      final handA = gameA.player.hand.map((c) => c.id).toList();
-      final handB = gameB.player.hand.map((c) => c.id).toList();
-      expect(handA, isNot(equals(handB)));
-    });
+        final handA = gameA.player.hand.map((c) => c.id).toList();
+        final handB = gameB.player.hand.map((c) => c.id).toList();
+        expect(handA, isNot(equals(handB)));
+      },
+    );
   });
 
   group('resources', () {
@@ -81,15 +87,18 @@ void main() {
       expect(game.player.resourceCap, 1);
     });
 
-    test("resource cap grows by 1 each of a player's own turns, up to the max", () {
-      final game = _newGame(forcePlayerFirst: true);
-      game.player.hp = 100000; // keep the match running for the full loop
-      for (var i = 0; i < 20; i++) {
-        game.endTurn();
-      }
-      expect(game.player.resourceCap, GameEngine.maxResourceCap);
-      expect(game.player.resource, GameEngine.maxResourceCap);
-    });
+    test(
+      "resource cap grows by 1 each of a player's own turns, up to the max",
+      () {
+        final game = _newGame(forcePlayerFirst: true);
+        game.player.hp = 100000; // keep the match running for the full loop
+        for (var i = 0; i < 20; i++) {
+          game.endTurn();
+        }
+        expect(game.player.resourceCap, GameEngine.maxResourceCap);
+        expect(game.player.resource, GameEngine.maxResourceCap);
+      },
+    );
   });
 
   group('playing cards', () {
@@ -109,8 +118,9 @@ void main() {
 
     test('cannot play a card that costs more than available resource', () {
       final game = _newGame(forcePlayerFirst: true);
-      final expensiveCard =
-          game.player.hand.reduce((a, b) => a.attackCost > b.attackCost ? a : b);
+      final expensiveCard = game.player.hand.reduce(
+        (a, b) => a.attackCost > b.attackCost ? a : b,
+      );
       // The opening hand always has at least one 1-cost card available
       // from this catalog slice, and resource is only 1 on turn 1.
       if (expensiveCard.attackCost <= game.player.resource) {
@@ -168,8 +178,12 @@ void main() {
   group('attacking', () {
     test('attacking a card deals mutual damage and can defeat both sides', () {
       final game = _newGame(forcePlayerFirst: true);
-      final attacker = BattlefieldCard(cardCatalog.firstWhere((c) => c.id == 'lion'));
-      final defender = BattlefieldCard(cardCatalog.firstWhere((c) => c.id == 'fox'));
+      final attacker = BattlefieldCard(
+        cardCatalog.firstWhere((c) => c.id == 'lion'),
+      );
+      final defender = BattlefieldCard(
+        cardCatalog.firstWhere((c) => c.id == 'fox'),
+      );
       game.player.battlefield.add(attacker);
       game.opponent.battlefield.add(defender);
 
@@ -186,7 +200,9 @@ void main() {
       final game = _newGame(forcePlayerFirst: true);
       // Fox's attack (15) is less than starting HP (30), so this checks
       // plain subtraction without the 0-floor kicking in.
-      final attacker = BattlefieldCard(cardCatalog.firstWhere((c) => c.id == 'fox'));
+      final attacker = BattlefieldCard(
+        cardCatalog.firstWhere((c) => c.id == 'fox'),
+      );
       game.player.battlefield.add(attacker);
       final startingHp = game.opponent.hp;
 
@@ -197,7 +213,9 @@ void main() {
 
     test('a player\'s HP cannot go below 0', () {
       final game = _newGame(forcePlayerFirst: true);
-      final attacker = BattlefieldCard(cardCatalog.firstWhere((c) => c.id == 'lion'));
+      final attacker = BattlefieldCard(
+        cardCatalog.firstWhere((c) => c.id == 'lion'),
+      );
       game.player.battlefield.add(attacker);
       game.opponent.hp = 10; // less than Lion's 55 attack
 
@@ -208,7 +226,9 @@ void main() {
 
     test('a card cannot attack twice in the same turn', () {
       final game = _newGame(forcePlayerFirst: true);
-      final attacker = BattlefieldCard(cardCatalog.firstWhere((c) => c.id == 'lion'));
+      final attacker = BattlefieldCard(
+        cardCatalog.firstWhere((c) => c.id == 'lion'),
+      );
       game.player.battlefield.add(attacker);
 
       game.attackPlayer(game.player, attacker);
@@ -221,7 +241,9 @@ void main() {
 
     test('cannot attack when it is not your turn', () {
       final game = _newGame(forcePlayerFirst: true);
-      final attacker = BattlefieldCard(cardCatalog.firstWhere((c) => c.id == 'lion'));
+      final attacker = BattlefieldCard(
+        cardCatalog.firstWhere((c) => c.id == 'lion'),
+      );
       game.opponent.battlefield.add(attacker);
 
       expect(
@@ -232,7 +254,9 @@ void main() {
 
     test('cannot attack with a card that is not on your battlefield', () {
       final game = _newGame(forcePlayerFirst: true);
-      final notOnBoard = BattlefieldCard(cardCatalog.firstWhere((c) => c.id == 'lion'));
+      final notOnBoard = BattlefieldCard(
+        cardCatalog.firstWhere((c) => c.id == 'lion'),
+      );
 
       expect(
         () => game.attackPlayer(game.player, notOnBoard),
@@ -243,7 +267,9 @@ void main() {
     test('defeating the opponent ends the game with the player winning', () {
       final game = _newGame(forcePlayerFirst: true);
       game.opponent.hp = 10;
-      final attacker = BattlefieldCard(cardCatalog.firstWhere((c) => c.id == 'lion'));
+      final attacker = BattlefieldCard(
+        cardCatalog.firstWhere((c) => c.id == 'lion'),
+      );
       game.player.battlefield.add(attacker);
 
       game.attackPlayer(game.player, attacker);
@@ -254,14 +280,17 @@ void main() {
   });
 
   group('turns', () {
-    test('ending the player\'s turn eventually returns control to the player', () {
-      final game = _newGame(forcePlayerFirst: true);
+    test(
+      'ending the player\'s turn eventually returns control to the player',
+      () {
+        final game = _newGame(forcePlayerFirst: true);
 
-      game.endTurn();
+        game.endTurn();
 
-      expect(game.isPlayerTurn, isTrue);
-      expect(game.turnNumber, 2);
-    });
+        expect(game.isPlayerTurn, isTrue);
+        expect(game.turnNumber, 2);
+      },
+    );
 
     test('a defeated player stops the opponent from taking further turns', () {
       final game = _newGame(forcePlayerFirst: true);

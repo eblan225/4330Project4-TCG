@@ -8,7 +8,7 @@ import 'battlefield_card.dart';
 /// [GameEngine] — it's runtime state, not saved data like a [Deck].
 class PlayerState {
   PlayerState({required this.name, required List<GameCard> deckCards})
-      : deck = List<GameCard>.from(deckCards);
+    : deck = List<GameCard>.from(deckCards);
 
   final String name;
 

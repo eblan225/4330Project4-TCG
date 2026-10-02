@@ -113,7 +113,9 @@ void main() {
     expect(deckLibrary.decks, isEmpty);
   });
 
-  testWidgets('Clear Deck empties the current deck', (WidgetTester tester) async {
+  testWidgets('Clear Deck empties the current deck', (
+    WidgetTester tester,
+  ) async {
     await _openDeckBuilder(tester);
 
     await tester.tap(find.byKey(const ValueKey('available-fox')));

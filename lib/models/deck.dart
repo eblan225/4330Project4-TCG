@@ -6,7 +6,7 @@
 /// stats, artwork, ...) looks them up from `cardCatalog` by id.
 class Deck {
   Deck({required this.name, Map<String, int>? cardCounts})
-      : cardCounts = cardCounts ?? <String, int>{};
+    : cardCounts = cardCounts ?? <String, int>{};
 
   /// How many cards a deck needs to be playable.
   static const int deckSize = 30;
@@ -59,5 +59,6 @@ class Deck {
 
   void clear() => cardCounts.clear();
 
-  Deck copy() => Deck(name: name, cardCounts: Map<String, int>.from(cardCounts));
+  Deck copy() =>
+      Deck(name: name, cardCounts: Map<String, int>.from(cardCounts));
 }

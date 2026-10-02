@@ -30,11 +30,14 @@ void main() {
     expect(deckLibrary.decks, hasLength(1));
   });
 
-  test('saving a deck with an existing name replaces it instead of duplicating', () {
-    deckLibrary.saveDeck(Deck(name: 'My Deck', cardCounts: {'lion': 1}));
-    deckLibrary.saveDeck(Deck(name: 'My Deck', cardCounts: {'tiger': 2}));
+  test(
+    'saving a deck with an existing name replaces it instead of duplicating',
+    () {
+      deckLibrary.saveDeck(Deck(name: 'My Deck', cardCounts: {'lion': 1}));
+      deckLibrary.saveDeck(Deck(name: 'My Deck', cardCounts: {'tiger': 2}));
 
-    expect(deckLibrary.decks, hasLength(1));
-    expect(deckLibrary.decks.first.cardCounts, {'tiger': 2});
-  });
+      expect(deckLibrary.decks, hasLength(1));
+      expect(deckLibrary.decks.first.cardCounts, {'tiger': 2});
+    },
+  );
 }

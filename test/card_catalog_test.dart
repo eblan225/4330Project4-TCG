@@ -17,8 +17,16 @@ void main() {
 
   test('every card has positive stats and a valid attack cost', () {
     for (final card in cardCatalog) {
-      expect(card.hp, greaterThan(0), reason: '${card.name} should have positive HP');
-      expect(card.attack, greaterThan(0), reason: '${card.name} should have positive attack');
+      expect(
+        card.hp,
+        greaterThan(0),
+        reason: '${card.name} should have positive HP',
+      );
+      expect(
+        card.attack,
+        greaterThan(0),
+        reason: '${card.name} should have positive attack',
+      );
       expect(
         card.attackCost,
         inInclusiveRange(1, 6),
@@ -43,7 +51,8 @@ void main() {
       expect(
         averageAt(costs[i]),
         greaterThan(averageAt(costs[i - 1])),
-        reason: 'cost ${costs[i]} cards should average stronger than cost ${costs[i - 1]} cards',
+        reason:
+            'cost ${costs[i]} cards should average stronger than cost ${costs[i - 1]} cards',
       );
     }
   });

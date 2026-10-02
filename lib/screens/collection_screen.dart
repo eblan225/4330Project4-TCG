@@ -51,7 +51,9 @@ class _CollectionScreenState extends State<CollectionScreen> {
   @override
   Widget build(BuildContext context) {
     final cards = _visibleCards();
-    final ownedCount = cardCatalog.where((c) => playerCollection.owns(c.id)).length;
+    final ownedCount = cardCatalog
+        .where((c) => playerCollection.owns(c.id))
+        .length;
 
     return Scaffold(
       appBar: AppBar(title: const Text('Card Collection')),
@@ -107,7 +109,10 @@ class _CollectionScreenState extends State<CollectionScreen> {
                   underline: const SizedBox.shrink(),
                   items: [
                     for (final option in _SortOption.values)
-                      DropdownMenuItem(value: option, child: Text(option.label)),
+                      DropdownMenuItem(
+                        value: option,
+                        child: Text(option.label),
+                      ),
                   ],
                   onChanged: (option) {
                     if (option != null) setState(() => _sortOption = option);
@@ -118,15 +123,18 @@ class _CollectionScreenState extends State<CollectionScreen> {
             const SizedBox(height: 8),
             Expanded(
               child: cards.isEmpty
-                  ? const Center(child: Text('No cards match your search/filter.'))
+                  ? const Center(
+                      child: Text('No cards match your search/filter.'),
+                    )
                   : GridView.builder(
                       itemCount: cards.length,
-                      gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
-                        maxCrossAxisExtent: 150,
-                        mainAxisSpacing: 12,
-                        crossAxisSpacing: 12,
-                        childAspectRatio: 1 / 1.4,
-                      ),
+                      gridDelegate:
+                          const SliverGridDelegateWithMaxCrossAxisExtent(
+                            maxCrossAxisExtent: 150,
+                            mainAxisSpacing: 12,
+                            crossAxisSpacing: 12,
+                            childAspectRatio: 1 / 1.4,
+                          ),
                       itemBuilder: (context, index) => Center(
                         child: TradingCardView(
                           data: cards[index],
@@ -146,8 +154,10 @@ class _CollectionScreenState extends State<CollectionScreen> {
     final query = _searchController.text.trim().toLowerCase();
 
     final filtered = cardCatalog.where((card) {
-      final matchesRarity = _rarityFilter == null || card.rarity == _rarityFilter;
-      final matchesSearch = query.isEmpty ||
+      final matchesRarity =
+          _rarityFilter == null || card.rarity == _rarityFilter;
+      final matchesSearch =
+          query.isEmpty ||
           card.name.toLowerCase().contains(query) ||
           card.animal.toLowerCase().contains(query);
       return matchesRarity && matchesSearch;
